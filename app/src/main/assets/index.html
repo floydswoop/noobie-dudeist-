@@ -6,10 +6,10 @@
 <title>Sky Ear</title>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
---bg:#eef0ee;--fg:#16201c;--mut:#5b6862;--card:#fff;--ac:#0b6e5a;--acfg:#fff;--bd:#c9d0cc;--fl:#b3480b;--flfg:#fff}
+--bg:#eef0ee;--fg:#16201c;--mut:#5b6862;--card:#fff;--ac:#0b6e5a;--acfg:#fff;--bd:#c9d0cc;--fl:#b3480b;--flfg:#fff;--ll:0}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731;--fl:#ffb454;--flfg:#2a1600}}
-:root[data-theme="dark"]{--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731;--fl:#ffb454;--flfg:#2a1600}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ll:1;--bg:#0a0603;--fg:#e9a23b;--mut:#b27b32;--card:#150d05;--ac:#ffb454;--acfg:#1a0e00;--bd:#5a3b14;--fl:#ffb454;--flfg:#1a0e00}}
+:root[data-theme="dark"]{--ll:1;--bg:#0a0603;--fg:#e9a23b;--mut:#b27b32;--card:#150d05;--ac:#ffb454;--acfg:#1a0e00;--bd:#5a3b14;--fl:#ffb454;--flfg:#1a0e00}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 "Barlow Condensed","Arial Narrow",system-ui,sans-serif}
 main{max-width:560px;margin:0 auto;padding:16px}
@@ -96,6 +96,12 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 </section>
 </main>
 <script>
+// Low-light (dark) theme draws spectrograms in pure amber so the screen stays easy on night-adapted eyes.
+let LL=false;
+function llUpdate(){try{LL=getComputedStyle(document.documentElement).getPropertyValue('--ll').trim()==='1'}catch(e){}}
+function spx(d,j,s){if(LL){d[j]=s;d[j+1]=s*.55;d[j+2]=s*.04}else{d[j]=s;d[j+1]=s*.85;d[j+2]=40+s*.6}d[j+3]=255}
+try{llUpdate();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',llUpdate)}catch(e){}
+
 const $=s=>document.querySelector(s);
 // key,label,min,max,step,default,unit,rebuild
 const P=[
@@ -250,7 +256,7 @@ function draw(){
   const col=c2.createImageData(1,Ht);
   for(let y=0;y<Ht;y++){
     const s=d[Math.min(N-1,Math.floor((Ht-1-y)/Ht*5000/ny*N))],j=y*4;
-    col.data[j]=s;col.data[j+1]=s*.85;col.data[j+2]=40+s*.6;col.data[j+3]=255;
+    spx(col.data,j,s);
   }
   c2.putImageData(col,W-1,0);
   requestAnimationFrame(draw);
@@ -447,7 +453,7 @@ function lLoop(){
     const col=l2.createImageData(1,H);
     for(let y=0;y<H;y++){
       const dB=d[Math.min(N-1,Math.floor((H-1-y)/H*5000/(sr/2)*N))],s=Math.max(0,Math.min(255,(dB+100)/70*255)),j=y*4;
-      col.data[j]=s;col.data[j+1]=s*.85;col.data[j+2]=40+s*.6;col.data[j+3]=255;
+      spx(col.data,j,s);
     }
     l2.putImageData(col,lc.width-1,0);
     const now=performance.now();
@@ -491,7 +497,7 @@ function lFile(buf){
   for(let c=0;c<W;c++)for(let y=0;y<H;y++){
     const k=Math.min(n/2-1,Math.floor((H-1-y)/H*5000/(r.sr/2)*(n/2))),db=10*Math.log10(r.cols[c][k]+1e-14),
     sv=Math.max(0,Math.min(255,(db+100)/70*255)),j=(y*W+c)*4;
-    img.data[j]=sv;img.data[j+1]=sv*.85;img.data[j+2]=40+sv*.6;img.data[j+3]=255;
+    spx(img.data,j,sv);
   }
   l2.putImageData(img,0,0);
   lShow(analyze(r.dB,r.sr));
