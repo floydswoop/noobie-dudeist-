@@ -51,7 +51,6 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <body>
 <main>
 <h1>Sky Ear</h1>
-<p class="mut" id="hpNote" hidden>Use headphones. Phone speakers can't reproduce low tones.</p>
 <div class="row tabs"><button id="tOv" class="sel">Field</button><button id="tSyn">Synth</button><button id="tQz">Quiz</button><button id="tLs">Listen</button><button id="tLb">Library</button></div>
 <section id="syn" hidden>
 <div class="row"><button id="go" class="main">Start</button><button id="fly" disabled>Fly-by</button></div>
@@ -379,7 +378,6 @@ function tab(w){
   $('#go').textContent='Start';$('#fly').disabled=true;
   if(w!=='lsn'&&lOn)lStop();
   if(w==='cls')libList();
-  $('#hpNote').hidden=(w==='ovh');   // headphone tip is for the sound tabs, not Field
   compassWant(w==='ovh');if(w==='ovh')rdDraw();
   if(w==='syn')P.forEach(p=>{els[p[0]].i.value=v[p[0]];els[p[0]].show()});
 }
