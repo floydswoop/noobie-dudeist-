@@ -25,7 +25,7 @@ Sky Ear started as a drone-safety idea: help people recognize the sound of diffe
 
 ## Build it
 
-The full, beginner-friendly walkthrough is in **[docs/BUILDING.md](docs/BUILDING.md)**. In short:
+The full, beginner-friendly walkthrough is in **[docs/BUILDING.md](BUILDING.md)**. In short:
 
 1. Create a new **Empty Activity** project in Android Studio named **Sky Ear** (keep the default package `com.example.skyear`).
 2. Copy the files from this repository's `app/src/main` folder over the matching files in your project.
@@ -42,14 +42,14 @@ The whole user interface is one file, `app/src/main/assets/index.html`, so you c
 | Internet | Asks the ADS-B service for nearby aircraft (nothing else) |
 | Bluetooth scan / Nearby devices / Wi-Fi state | Scanning for Remote ID broadcasts |
 
-Everything else (recordings, labels, settings) stays on the phone. See **[docs/PRIVACY.md](docs/PRIVACY.md)**.
+Everything else (recordings, labels, settings) stays on the phone. See **[docs/PRIVACY.md](PRIVACY.md)**.
 
 ## Documentation
 
-- [docs/BUILDING.md](docs/BUILDING.md): step-by-step build and troubleshooting
-- [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md): architecture, algorithms, data formats
-- [docs/PRIVACY.md](docs/PRIVACY.md): what is stored, what leaves the phone
-- [CONTRIBUTING.md](CONTRIBUTING.md): how to help, and how to run the tests
+- [docs/BUILDING.md](BUILDING.md): step-by-step build and troubleshooting
+- [docs/HOW_IT_WORKS.md](HOW_IT_WORKS.md): architecture, algorithms, data formats
+- [docs/PRIVACY.md](PRIVACY.md): what is stored, what leaves the phone
+- [CONTRIBUTING.md](../CONTRIBUTING.md): how to help, and how to run the tests
 
 ## Tests
 
@@ -82,4 +82,4 @@ Auto-start recording when an aircraft comes near; bulk export; a standalone Grad
 
 ## License
 
-[MIT](LICENSE).
+[MIT](../LICENSE).

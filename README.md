@@ -18,7 +18,7 @@ Sky Ear started as a drone-safety idea: help people recognize the sound of diffe
 
 ## Try it
 
-1. On your Android phone, download **[SkyEar.apk](https://github.com/floydswoop/sky-ear/raw/main/sky-ear/SkyEar.apk)**.
+1. On your Android phone, download **[SkyEar.apk](https://github.com/floydswoop/sky-ear/raw/main/SkyEar.apk)**.
 2. Open it and allow installs from this source when Android asks. (It is an unsigned debug build for testing.)
 3. Allow microphone, location and nearby devices on first use. Headphones help, since phone speakers cannot reproduce low tones.
 
@@ -26,16 +26,16 @@ Requires Android 8 or newer (Remote ID over Wi-Fi needs Android 11 or newer).
 
 ## Build it yourself
 
-You need a computer with the free [Android Studio](https://developer.android.com/studio). The step-by-step guide for beginners is **[sky-ear/docs/BUILDING.md](sky-ear/docs/BUILDING.md)**.
+You need a computer with the free [Android Studio](https://developer.android.com/studio). The step-by-step guide for beginners is **[docs/BUILDING.md](docs/BUILDING.md)**.
 
-The whole interface is one file, [`sky-ear/app/src/main/assets/index.html`](sky-ear/app/src/main/assets/index.html), so you can change colors, text and layout without touching Kotlin.
+The whole interface is one file, [`app/src/main/assets/index.html`](app/src/main/assets/index.html), so you can change colors, text and layout without touching Kotlin.
 
 ## Learn more
 
-- [Full project README](sky-ear/README.md): permissions, tests, known limitations, credits
-- [How it works](sky-ear/docs/HOW_IT_WORKS.md): sound analysis, ADS-B matching, Remote ID, phone pointing
-- [Privacy](sky-ear/docs/PRIVACY.md): what stays on the phone and what is sent out (your approximate location goes to the ADS-B service, api.adsb.lol)
-- [Contributing](sky-ear/CONTRIBUTING.md): how to help and run the tests (`node sky-ear/tests/run-tests.js`)
+- [Full project README](docs/PROJECT.md): permissions, tests, known limitations, credits
+- [How it works](docs/HOW_IT_WORKS.md): sound analysis, ADS-B matching, Remote ID, phone pointing
+- [Privacy](docs/PRIVACY.md): what stays on the phone and what is sent out (your approximate location goes to the ADS-B service, api.adsb.lol)
+- [Contributing](CONTRIBUTING.md): how to help and run the tests (`node tests/run-tests.js`)
 
 ## Notices
 
@@ -43,4 +43,4 @@ Aircraft data comes from the community [adsb.lol](https://adsb.lol) API, and its
 
 ## License
 
-[MIT](sky-ear/LICENSE)
+[MIT](LICENSE)
