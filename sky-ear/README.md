@@ -9,6 +9,7 @@ Sky Ear started as a drone-safety idea: help people recognize the sound of diffe
 - **Listen.** Analyzes a live microphone feed or a saved recording: spectrogram, fundamental pitch, harmonics, and the closest synth presets.
 - **Field** (the first tab).
   - *Start scan:* one button that listens through the microphone, checks ADS-B for nearby aircraft every 15 seconds, and scans for Remote ID drone broadcasts, with one combined readout.
+  - *Radar:* plots nearby aircraft around you with the direction the phone points, so you can aim at a contact. Switches between pointing-up and north-up.
   - *What's overhead:* lists nearby aircraft from public ADS-B data (type, distance, direction, altitude, angle above the horizon).
   - *Remote ID:* scans Bluetooth and Wi-Fi for drones broadcasting the standard Remote ID signal.
   - *Record a clip:* records audio, and at the same time logs nearby aircraft, Remote ID drones, and where the phone was pointing (compass direction and tilt).
