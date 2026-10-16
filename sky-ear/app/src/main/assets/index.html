@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sky Ear</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef0ee;--fg:#16201c;--mut:#5b6862;--card:#fff;--ac:#0b6e5a;--acfg:#fff;--bd:#c9d0cc}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731}}
+:root[data-theme="dark"]{--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 "Barlow Condensed","Arial Narrow",system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:.2px}
+.mut{color:var(--mut);margin:0 0 12px;font-size:15px}
+.row{display:flex;gap:8px;margin-bottom:12px}
+button{font:inherit;font-weight:600;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:10px 14px;min-height:44px}
+button.main{flex:1;background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+button:disabled{opacity:.45}
+.tabs{gap:4px}.tabs button{flex:1;padding:10px 2px;font-size:14px}
+#cList button{text-align:left}small{color:var(--mut);font-weight:400}.tabs .sel{background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+.stack{display:grid;gap:8px}.stack button{width:100%}.res p{margin:6px 0}
+select{font:inherit;font-weight:600;width:100%;min-height:44px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 10px;margin-bottom:4px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+canvas{width:100%;height:120px;display:block;background:#000;border-radius:8px}
+.cap{color:var(--mut);font-size:13px;margin:4px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:12px 0}
+label b{font-weight:600}
+input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
+</style>
+</head>
+<body>
+<main>
+<h1>Sky Ear</h1>
+<p class="mut">Use headphones. Phone speakers can't reproduce low tones.</p>
+<div class="row tabs"><button id="tSyn" class="sel">Synth</button><button id="tQz">Quiz</button><button id="tLs">Listen</button><button id="tOv">Field</button><button id="tLb">Library</button></div>
+<section id="syn">
+<div class="row"><button id="go" class="main">Start</button><button id="fly" disabled>Fly-by</button></div>
+<canvas id="sp" width="320" height="120"></canvas>
+<div class="cap">Spectrogram, 0 to 5 kHz, newest on the right</div>
+<select id="lib" aria-label="Sound library"><option value="">Choose a sound…</option></select>
+<div class="cap">Drone settings are estimates from typical hover specs, not recordings. Adjust the sliders to match real recordings.</div>
+<div id="ctl"></div>
+</section>
+<section id="qz" hidden>
+<p class="mut">Up to 20 sounds. Say whether each is a drone, then name the type. Names stay hidden until you answer. Use headphones.</p>
+<label><span>Sounds to use</span><select id="qSrc" style="grid-column:1/3"><option value="syn">Synthesized</option><option value="real">My recordings (labeled in the Library)</option><option value="mix">Both</option></select></label>
+<div id="qBox"><div class="stack"><button data-a="start" class="main">Start quiz</button></div></div>
+</section>
+<section id="lsn" hidden>
+<p class="mut">Measures a sound with your microphone. Audio is analyzed on your phone and is not recorded or uploaded. Hold the phone toward the source, away from wind.</p>
+<div class="row"><button id="lGo" class="main">Start listening</button><button id="lFr" disabled>Freeze</button></div>
+<button id="lPick" style="width:100%;margin-bottom:12px">Analyze a recording instead</button>
+<input type="file" id="lFile" accept="audio/*" hidden>
+<canvas id="lc" width="320" height="120"></canvas>
+<div class="cap">Spectrogram, 0 to 5 kHz, newest on the right</div>
+<div id="lOut" class="res"></div>
+<div class="stack"><button id="lUse" hidden>Copy best match to Synth</button></div>
+</section>
+<section id="ovh" hidden>
+<p class="mut">Shows aircraft near you from public ADS-B data. This sends your approximate location to the data service (api.adsb.lol). Works in the Android app only.</p>
+<div class="row"><button id="oGo" class="main">What's overhead</button></div>
+<label><span>Search radius</span><b id="oR"></b><input type="range" id="oRad" min="5" max="50" step="5" value="15"></label>
+<div id="oOut" class="res"></div>
+<h2 style="font-size:20px;margin:20px 0 6px">Broadcasting drones (Remote ID)</h2>
+<p class="mut">Listens for the standard Remote ID signals that drones broadcast over Bluetooth and Wi-Fi. It only shows drones that broadcast, within roughly a few hundred meters. Android app only.</p>
+<div class="row"><button id="idGo" class="main">Start scanning</button></div>
+<div id="idSt" class="res"></div>
+<div id="idList" class="res"></div>
+<h2 style="font-size:20px;margin:20px 0 6px">Record a clip</h2>
+<p class="mut">Records audio and tags it with nearby aircraft from ADS-B, using the search radius above. Keep the screen on and point the phone toward the sound. Stops by itself after 2 minutes.</p>
+<div class="row"><button id="rGo" class="main">Start recording</button></div>
+<div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:8px"><div id="rLv" style="height:100%;width:0;background:var(--ac)"></div></div>
+<label><span>Aim with</span><select id="ptMode" style="grid-column:1/3"><option value="1">Back of phone (like a camera)</option><option value="2">Top edge of phone</option></select></label>
+<div id="ptLive" class="res"></div>
+<div id="rSt" class="res"></div>
+</section>
+<section id="cls" hidden>
+<p class="mut">Clips you recorded, with analysis and likely aircraft sources. They are stored on this phone.</p>
+<div id="cList"></div>
+<div id="cDet"></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+// key,label,min,max,step,default,unit,rebuild
+const P=[
+['motors','Motors',1,8,1,4,'',1],
+['blades','Blades per prop',1,4,1,2,'',0],
+['rpm','Prop RPM',1000,30000,50,8000,'',0],
+['mis','RPM mismatch',0,10,.5,3,'%',0],
+['wob','Pitch wobble',0,60,1,8,' cents',0],
+['harm','Harmonics',1,14,1,10,'',1],
+['roll','Harmonic rolloff',.3,.95,.01,.8,'',1],
+['whine','Motor whine',0,1,.05,.5,'',0],
+['load','Load',0,1,.05,.2,'',0],
+['noise','Air noise',0,1,.05,.25,'',0],
+['dist','Distance',5,300,5,20,' m',0]];
+// order: motors,blades,rpm,mismatch,wobble,harmonics,rolloff,whine,load,noise,distance
+const LIB={drones:{
+'DJI Mini 4 Pro':[4,2,11000,3,8,10,.8,.55,.15,.2,20],
+'DJI Air 3':[4,2,8500,3,8,10,.8,.5,.2,.2,20],
+'DJI Mavic 3':[4,2,6000,2,8,9,.75,.4,.25,.2,25],
+'DJI Phantom 4':[4,2,4800,3,8,9,.75,.3,.3,.25,25],
+'DJI Matrice 350 RTK':[4,2,3000,2,8,8,.7,.2,.4,.25,40],
+'DJI Agras T40 (spray)':[8,2,2800,2,10,7,.7,.15,.6,.3,40],
+'Autel EVO II Pro':[4,2,6200,3,8,9,.75,.4,.25,.2,25],
+'Parrot Anafi':[4,2,9000,3,8,10,.8,.45,.2,.2,20],
+'Skydio X10':[4,2,7000,2,8,9,.75,.4,.25,.2,25],
+'FPV 5-inch freestyle':[4,3,21000,4,12,6,.7,.35,.3,.35,20],
+'FPV 3-inch cinewhoop':[4,3,24000,4,12,5,.65,.4,.2,.25,15],
+'Toy mini drone':[4,2,18000,5,10,5,.6,.6,.1,.15,10],
+'Generic hexacopter':[6,2,4500,2,8,8,.7,.25,.35,.2,30],
+'Generic heavy-lift octocopter':[8,2,3000,2,8,7,.7,.15,.5,.2,40],
+'Generic fixed-wing prop':[1,2,4800,0,8,8,.75,.1,.3,.3,40]},
+fp:{
+'Leaf blower':[1,1,6000,1,25,3,.5,0,.2,.9,15],
+'Lawn mower (gas)':[1,1,3200,0,30,12,.85,0,.4,.6,15],
+'Moped / 2-stroke scooter':[1,1,6000,0,22,12,.8,0,.5,.35,20],
+'Weed trimmer':[1,1,9000,0,30,10,.8,0,.4,.5,12],
+'Vacuum cleaner':[1,1,17000,0,6,5,.6,.5,.2,.8,5],
+'Box fan':[1,5,1500,1,5,3,.5,0,.2,.6,5],
+'Air conditioner hum':[1,2,1800,0,2,6,.6,0,0,.3,10],
+'Honeybee':[1,1,13800,0,45,4,.5,0,0,.05,5],
+'Mosquito':[1,1,30000,0,50,3,.4,0,0,.03,5],
+'Light prop plane':[1,2,2400,0,12,10,.8,0,.3,.25,60]}};
+const v={},els={};
+P.forEach(p=>v[p[0]]=p[5]);
+P.forEach(([k,l,mn,mx,st,d,u,rb])=>{
+  const w=document.createElement('label');
+  w.innerHTML=`<span>${l}</span><b></b><input type="range" min="${mn}" max="${mx}" step="${st}" value="${d}">`;
+  const i=w.querySelector('input'),o=w.querySelector('b');
+  const show=()=>o.textContent=v[k]+u;
+  i.oninput=()=>{v[k]=+i.value;show();rb?build():update()};
+  els[k]={i,show};show();$('#ctl').appendChild(w);
+});
+const sel=$('#lib');
+const grp=(label,obj)=>{const g=document.createElement('optgroup');g.label=label;
+  Object.keys(obj).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;g.appendChild(o)});sel.appendChild(g)};
+grp('Drones (estimated settings)',LIB.drones);grp('Not drones (lookalikes)',LIB.fp);
+sel.onchange=()=>{
+  const a=LIB.drones[sel.value]||LIB.fp[sel.value];if(!a)return;
+  P.forEach((p,j)=>{v[p[0]]=a[j];els[p[0]].i.value=a[j];els[p[0]].show()});build();
+};
+
+let ctx,bus,lp,dg,mg,an,nG,dop,nodes=[],osc=[],wh=[],lgs=[],on=false,flying=false;
+const rnd=Array.from({length:8},()=>Math.random()*2-1);
+
+function init(){
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  bus=ctx.createGain();lp=ctx.createBiquadFilter();lp.type='lowpass';
+  dg=ctx.createGain();mg=ctx.createGain();mg.gain.value=0;
+  an=ctx.createAnalyser();an.fftSize=2048;
+  bus.connect(lp);lp.connect(dg);dg.connect(mg);mg.connect(an);an.connect(ctx.destination);
+  const nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),d=nb.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const ns=ctx.createBufferSource();ns.buffer=nb;ns.loop=true;
+  const nf=ctx.createBiquadFilter();nf.type='bandpass';nf.frequency.value=1200;nf.Q.value=.4;
+  nG=ctx.createGain();ns.connect(nf);nf.connect(nG);nG.connect(bus);ns.start();
+  dop=ctx.createConstantSource();dop.start();
+  build();
+}
+
+function build(){
+  if(!ctx)return;
+  nodes.forEach(n=>{try{n.stop&&n.stop()}catch(e){}n.disconnect()});
+  nodes=[];osc=[];wh=[];lgs=[];dop.disconnect();
+  const H=v.harm,re=new Float32Array(H+1),im=new Float32Array(H+1);
+  for(let k=1;k<=H;k++)im[k]=Math.pow(v.roll,k-1);
+  const wave=ctx.createPeriodicWave(re,im),f0=v.blades*v.rpm*(1-.12*v.load)/60;
+  for(let i=0;i<v.motors;i++){
+    const f=f0*(1+rnd[i]*v.mis/100),o=ctx.createOscillator();o.setPeriodicWave(wave);o.frequency.value=f;
+    const g=ctx.createGain();g.gain.value=.5/Math.sqrt(v.motors);
+    const w=ctx.createOscillator(),wg=ctx.createGain();w.frequency.value=Math.min(f*12,9000);
+    const l=ctx.createOscillator(),lg=ctx.createGain();
+    l.frequency.value=3+Math.abs(rnd[i])*6;lg.gain.value=v.wob;l.connect(lg);
+    [o,w].forEach(x=>{lg.connect(x.detune);dop.connect(x.detune)});
+    o.connect(g);g.connect(bus);w.connect(wg);wg.connect(bus);
+    o.start();w.start();l.start();
+    nodes.push(o,g,w,wg,l,lg);osc.push(o);wh.push([w,wg]);lgs.push(lg);
+  }
+  update();
+}
+
+function setDist(r){
+  const t=ctx.currentTime;
+  dg.gain.setTargetAtTime(Math.min(1,10/r),t,.03);
+  lp.frequency.setTargetAtTime(14000/(1+r/20),t,.03);
+}
+
+function update(){
+  if(!ctx)return;
+  const t=ctx.currentTime,f0=v.blades*v.rpm*(1-.12*v.load)/60;
+  osc.forEach((o,i)=>{
+    const f=f0*(1+rnd[i]*v.mis/100);
+    o.frequency.setTargetAtTime(f,t,.05);
+    wh[i][0].frequency.setTargetAtTime(Math.min(f*12,9000),t,.05);
+    wh[i][1].gain.setTargetAtTime(v.whine*.05*(1+v.load),t,.05);
+  });
+  nG.gain.setTargetAtTime(v.noise*.3+v.load*.08,t,.1);
+  lgs.forEach(g=>g.gain.setTargetAtTime(v.wob,t,.05));
+  if(!flying)setDist(v.dist);
+}
+
+$('#go').onclick=async()=>{
+  if(!ctx)init();
+  await ctx.resume();
+  on=!on;
+  mg.gain.setTargetAtTime(on?.8:0,ctx.currentTime,.05);
+  $('#go').textContent=on?'Stop':'Start';
+  $('#fly').disabled=!on;
+  if(on)draw();else setTimeout(()=>{if(!on)ctx.suspend()},300);
+};
+
+// Fly-by: 18 m/s pass at the Distance setting, with Doppler shift, level and filter changes
+$('#fly').onclick=()=>{
+  if(flying)return;
+  flying=true;
+  const D=v.dist,V=18,c=343,t0=performance.now();
+  const step=()=>{
+    const x=-90+V*(performance.now()-t0)/1000,r=Math.hypot(x,D);
+    if(x>90){flying=false;dop.offset.setTargetAtTime(0,ctx.currentTime,.05);setDist(v.dist);return}
+    dop.offset.setTargetAtTime(1200*Math.log2(c/(c+V*x/r)),ctx.currentTime,.02);
+    setDist(r);requestAnimationFrame(step);
+  };
+  step();
+};
+
+const cv=$('#sp'),c2=cv.getContext('2d');
+c2.fillStyle='#000';c2.fillRect(0,0,cv.width,cv.height);
+function draw(){
+  if(!on)return;
+  const W=cv.width,Ht=cv.height,N=an.frequencyBinCount,d=new Uint8Array(N),ny=ctx.sampleRate/2;
+  an.getByteFrequencyData(d);
+  c2.drawImage(cv,-1,0);
+  const col=c2.createImageData(1,Ht);
+  for(let y=0;y<Ht;y++){
+    const s=d[Math.min(N-1,Math.floor((Ht-1-y)/Ht*5000/ny*N))],j=y*4;
+    col.data[j]=s;col.data[j+1]=s*.85;col.data[j+2]=40+s*.6;col.data[j+3]=255;
+  }
+  c2.putImageData(col,W-1,0);
+  requestAnimationFrame(draw);
+}
+
+// ---- Quiz ----
+const TYPE={},TYPES=['Camera quad','FPV or toy','Large multirotor','Fixed-wing'];
+[['Camera quad','DJI Mini 4 Pro','DJI Air 3','DJI Mavic 3','DJI Phantom 4','Autel EVO II Pro','Parrot Anafi','Skydio X10'],
+ ['FPV or toy','FPV 5-inch freestyle','FPV 3-inch cinewhoop','Toy mini drone'],
+ ['Large multirotor','DJI Matrice 350 RTK','DJI Agras T40 (spray)','Generic hexacopter','Generic heavy-lift octocopter'],
+ ['Fixed-wing','Generic fixed-wing prop']].forEach(([t,...ns])=>ns.forEach(n=>TYPE[n]=t));
+const shuf=a=>a.map(x=>[Math.random(),x]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+const zf=p=>{const q=p<.5?p:1-p,t=Math.sqrt(-2*Math.log(q)),x=t-(2.515517+.802853*t+.010328*t*t)/(1+1.432788*t+.189269*t*t+.001308*t*t*t);return p<.5?-x:x};
+const box=$('#qBox'),btn=(a,t,c='')=>`<button data-a="${a}" class="${c}">${t}</button>`;
+let Q=null;
+
+let qSrc=null,qMute=false;
+function qStopSrc(){if(qSrc){const x=qSrc;qSrc=null;setTimeout(()=>{try{x.stop()}catch(e){}},150)}}
+function realTrials(){
+  let a=[];try{a=JSON.parse(Android.listClips())}catch(e){}
+  return a.filter(m=>m.label==='aircraft'||m.label==='drone'||m.label==='other').map(m=>({
+    n:'Your recording: '+(m.note||fmtT(m.startMs))+' ('+m.label+')',d:m.label==='drone'?1:0,real:m.id,ty:m.label==='drone'?(m.dtype||TYPES[0]):undefined}));
+}
+async function qStart(){
+  if(!ctx)init();
+  await ctx.resume();
+  const mode=$('#qSrc').value,syn=()=>shuf(shuf(Object.keys(LIB.drones)).slice(0,10).map(n=>({n,d:1})).concat(Object.keys(LIB.fp).map(n=>({n,d:0}))));
+  const again='<div class="stack">'+btn('start','Try again','main')+'</div>';
+  let t;
+  if(mode==='syn')t=syn();
+  else{
+    if(!window.Android){box.innerHTML='<p>Your recordings are available in the Android app only.</p>'+again;return}
+    const r=shuf(realTrials());
+    if(mode==='real'){
+      if(!r.some(x=>x.d)||!r.some(x=>!x.d)){box.innerHTML='<p>Label at least one drone clip and one non-drone clip in the Library first.</p>'+again;return}
+      t=r.slice(0,20);
+    }else{const rr=r.slice(0,10);t=rr.concat(syn().slice(0,20-rr.length))}
+  }
+  Q={t:shuf(t),i:0,res:[],backup:Object.assign({},v)};
+  qNext();
+}
+async function qPlayReal(tr){
+  v.motors=0;v.noise=0;v.load=0;build();
+  const buf=await clipBuffer(tr.real),d=buf.getChannelData(0);
+  let pk=0;for(let i=0;i<d.length;i+=16){const a=Math.abs(d[i]);if(a>pk)pk=a}
+  const g=ctx.createGain();g.gain.value=Math.min(10,.5/Math.max(pk,.01));
+  const x=ctx.createBufferSource();x.buffer=buf;x.loop=true;x.connect(g);g.connect(mg);
+  x.start(0,Math.random()*Math.max(0,buf.duration-8));
+  qSrc=x;
+}
+async function qNext(){
+  if(Q.i>=Q.t.length)return qEnd();
+  const tr=Q.t[Q.i];
+  qMute=false;
+  if(tr.real){
+    box.innerHTML='<p class="mut">Loading sound '+(Q.i+1)+' of '+Q.t.length+'...</p>';
+    try{await qPlayReal(tr)}catch(e){Q.t.splice(Q.i,1);return qNext()}
+    mg.gain.setTargetAtTime(.8,ctx.currentTime+.1,.05);
+    Q.t0=performance.now()+100;
+  }else{
+    const a=(tr.d?LIB.drones:LIB.fp)[tr.n];
+    P.forEach((p,j)=>v[p[0]]=a[j]);
+    v.rpm=Math.round(v.rpm*(.92+Math.random()*.16));
+    v.dist=Math.round(Math.min(120,Math.max(5,a[10]*(.6+Math.random()*1.2))));
+    build();
+    mg.gain.setTargetAtTime(.8,ctx.currentTime+.25,.05);
+    Q.t0=performance.now()+250;
+  }
+  box.innerHTML=`<p class="mut">Sound ${Q.i+1} of ${Q.t.length}. It plays until you answer.</p><div class="stack">${btn('drone','Drone','main')}${btn('not','Not a drone')}${btn('snd','Stop sound')}</div>`;
+}
+function qAns(said){
+  const tr=Q.t[Q.i];
+  Q.cur={n:tr.n,d:tr.d,ty:tr.ty||TYPE[tr.n],said,rt:Math.max(0,Math.round(performance.now()-Q.t0))};
+  if(tr.d&&said)box.innerHTML=`<p class="mut">Which type?</p><div class="stack">${TYPES.map(t=>btn('t:'+t,t)).join('')}${btn('snd',qMute?'Play sound':'Stop sound')}</div>`;
+  else qFin();
+}
+function qFin(type){
+  const c=Q.cur;
+  mg.gain.setTargetAtTime(0,ctx.currentTime,.05);qStopSrc();
+  if(type)c.tc=type===c.ty;
+  Q.res.push(c);
+  let m=`${c.d===c.said?'Correct':'Wrong'}: that was ${c.d?'a drone':'not a drone'} (${c.n}).`;
+  if(c.d&&c.said)m+=c.tc?` Type correct: ${c.ty}.`:` The type was ${c.ty}.`;
+  Q.i++;
+  box.innerHTML=`<p>${m}</p><div class="stack">${btn('next',Q.i<Q.t.length?'Next sound':'See results','main')}</div>`;
+}
+function qEnd(){
+  const R=Q.res,D=R.filter(r=>r.d),N=R.filter(r=>!r.d);
+  const H=D.filter(r=>r.said).length,FA=N.filter(r=>r.said).length,tc=D.filter(r=>r.said&&r.tc).length;
+  const dp=zf((H+.5)/(D.length+1))-zf((FA+.5)/(N.length+1));
+  const rts=R.map(r=>r.rt).sort((a,b)=>a-b),med=rts[Math.floor(rts.length/2)];
+  const fa=N.filter(r=>r.said).map(r=>r.n).join(', ')||'none',ms=D.filter(r=>!r.said).map(r=>r.n).join(', ')||'none';
+  box.innerHTML=`<div class="res"><p>Drones detected: ${H} of ${D.length}</p><p>False alarms: ${FA} of ${N.length}</p><p>Sensitivity (d′): ${dp.toFixed(2)}. Near 0 is guessing; above 2 is strong.</p><p>Type correct: ${tc} of ${H}</p><p>Median response: ${(med/1000).toFixed(1)} s</p><p>Called a drone but weren't: ${fa}</p><p>Missed drones: ${ms}</p></div><div class="stack">${btn('start','Try again','main')}</div>`;
+}
+box.onclick=e=>{
+  const b=e.target.closest('button');if(!b)return;const a=b.dataset.a;
+  if(a==='start')qStart();else if(a==='drone')qAns(1);else if(a==='not')qAns(0);
+  else if(a==='snd'){qMute=!qMute;mg.gain.setTargetAtTime(qMute?0:.8,ctx.currentTime,.05);b.textContent=qMute?'Play sound':'Stop sound'}
+  else if(a==='next')qNext();else if(a.startsWith('t:'))qFin(a.slice(2));
+};
+function tab(w){
+  qStopSrc();
+  if(Q&&Q.backup){Object.assign(v,Q.backup);Q.backup=null;if(ctx)build()}
+  ['syn','qz','lsn','ovh','cls'].forEach(id=>$('#'+id).hidden=id!==w);
+  [['tSyn','syn'],['tQz','qz'],['tLs','lsn'],['tOv','ovh'],['tLb','cls']].forEach(([b,id])=>$('#'+b).classList.toggle('sel',id===w));
+  on=false;if(ctx)mg.gain.setTargetAtTime(0,ctx.currentTime,.05);
+  $('#go').textContent='Start';$('#fly').disabled=true;
+  if(w!=='lsn'&&lOn)lStop();
+  if(w==='cls')libList();
+  if(w==='syn')P.forEach(p=>{els[p[0]].i.value=v[p[0]];els[p[0]].show()});
+}
+$('#tSyn').onclick=()=>tab('syn');$('#tQz').onclick=()=>tab('qz');$('#tLs').onclick=()=>tab('lsn');$('#tOv').onclick=()=>tab('ovh');$('#tLb').onclick=()=>tab('cls');
+
+// ---- Listen (microphone) ----
+let ma,ms,mst,lOn=false,lFroze=false,lastA=null,lastT=0;
+const lc=$('#lc'),l2=lc.getContext('2d');
+l2.fillStyle='#000';l2.fillRect(0,0,lc.width,lc.height);
+
+function analyze(d0,sr){
+  const N=d0.length,d=Float32Array.from(d0,x=>isFinite(x)?x:-140),hz=sr/2/N;
+  const peak=Math.max(...d);
+  if(peak<-90)return {quiet:1};
+  const fl=Float32Array.from(d).sort()[N>>1];
+  const pk=f=>{const c=Math.round(f/hz);let m=-140;for(let i=Math.max(1,c-2);i<=Math.min(N-2,c+2);i++)m=Math.max(m,d[i]);return m};
+  let bs=-1,bf=0;
+  for(let f=40;f<=1500;f+=hz){
+    let sc=0;
+    for(let k=1;k<=6&&f*k<sr/2-100;k++)sc+=Math.max(0,Math.min(40,pk(f*k)-fl));
+    if(sc>bs){bs=sc;bf=f}
+  }
+  let kb=1,mb=-999;
+  for(let k=1;k<=6;k++){const m=pk(bf*k);if(m>mb){mb=m;kb=k}}
+  const c0=Math.round(bf*kb/hz);let c=c0,m=-999;
+  for(let i=Math.max(1,c0-2);i<=Math.min(N-2,c0+2);i++)if(d[i]>m){m=d[i];c=i}
+  const a=d[c-1],b=d[c],e=d[c+1],den=a-2*b+e,f0=(c+(den?.5*(a-e)/den:0))*hz/kb;
+  const lev=[],idx=[];
+  for(let k=1;k<=8;k++){const L=pk(f0*k);lev.push(L);if(f0*k<sr/2-100&&L-fl>=12)idx.push(k-1)}
+  const count=idx.length;
+  let slope=null,roll=null;
+  if(count>=3){
+    const n=count,sx=idx.reduce((p,i)=>p+i,0),sy=idx.reduce((p,i)=>p+lev[i],0),
+    sxy=idx.reduce((p,i)=>p+i*lev[i],0),sxx=idx.reduce((p,i)=>p+i*i,0);
+    slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);roll=Math.max(.3,Math.min(.95,Math.pow(10,slope/20)));
+  }
+  let cl=0;
+  for(let i=Math.max(1,Math.floor(f0*.92/hz));i<=Math.min(N-2,Math.ceil(f0*1.08/hz));i++)if(d[i]>d[i-1]&&d[i]>=d[i+1]&&d[i]-fl>=10)cl++;
+  let mt=null;
+  if(slope!==null){
+    const items=[...Object.entries(LIB.drones).map(([n,x])=>[n,x,1]),...Object.entries(LIB.fp).map(([n,x])=>[n,x,0])];
+    mt=items.map(([n,x,dr])=>{
+      const fx=x[1]*x[2]*(1-.12*x[8])/60,cents=Math.abs(1200*Math.log2(f0/fx)),es=20*Math.log10(x[6]);
+      return {n,dr,a:x,s:cents/150+Math.abs(slope-es)/6+.1*Math.abs(Math.min(count,8)-Math.min(x[5],8))};
+    }).sort((p,q)=>p.s-q.s).slice(0,3);
+  }
+  return {f0,count,slope,roll,cl,mt};
+}
+
+function lShow(r){
+  lastA=r;const o=$('#lOut'),u=$('#lUse');
+  if(r.quiet){o.innerHTML='<p>Too quiet. Move closer to the source.</p>';u.hidden=true;return}
+  if(!r.mt){o.innerHTML=`<p>No clear repeating tone (strongest candidate ${r.f0.toFixed(0)} Hz). Broadband or noisy sounds, like wind, don't show a harmonic series.</p>`;u.hidden=true;return}
+  o.innerHTML=`<p>Fundamental: ${r.f0.toFixed(0)} Hz (${r.count} of 8 harmonics clear)</p><p>Harmonic falloff: ${r.slope.toFixed(1)} dB per harmonic</p><p>${r.cl>=2?r.cl+' close peaks near the fundamental. That can mean several motors or beating.':'One clean peak near the fundamental.'}</p><p>Closest synth presets:</p>${r.mt.map(x=>`<p>${x.n} (${x.dr?'drone':'not a drone'})</p>`).join('')}<p class="mut">Rough comparison only. Many drones and machines overlap, so this is not a drone detector.</p>`;
+  u.hidden=false;
+}
+
+async function lStart(){
+  try{
+    if(!ctx)init();
+    await ctx.resume();
+    mst=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  }catch(e){
+    $('#lOut').textContent='Microphone unavailable ('+(e.name||'error')+'). Allow microphone access for this page. If it still fails, open the link directly in Chrome.';
+    return;
+  }
+  ms=ctx.createMediaStreamSource(mst);ma=ctx.createAnalyser();
+  ma.fftSize=8192;ma.smoothingTimeConstant=.7;ma.minDecibels=-110;ma.maxDecibels=-10;
+  ms.connect(ma);lOn=true;lFroze=false;
+  $('#lGo').textContent='Stop listening';$('#lFr').disabled=false;$('#lFr').textContent='Freeze';
+  lLoop();
+}
+function lStop(){
+  lOn=false;
+  if(mst)mst.getTracks().forEach(t=>t.stop());
+  if(ms)ms.disconnect();
+  $('#lGo').textContent='Start listening';$('#lFr').disabled=true;$('#lFr').textContent='Freeze';
+}
+function lLoop(){
+  if(!lOn)return;
+  if(!lFroze){
+    const N=ma.frequencyBinCount,d=new Float32Array(N),sr=ctx.sampleRate,H=lc.height;
+    ma.getFloatFrequencyData(d);
+    l2.drawImage(lc,-1,0);
+    const col=l2.createImageData(1,H);
+    for(let y=0;y<H;y++){
+      const dB=d[Math.min(N-1,Math.floor((H-1-y)/H*5000/(sr/2)*N))],s=Math.max(0,Math.min(255,(dB+100)/70*255)),j=y*4;
+      col.data[j]=s;col.data[j+1]=s*.85;col.data[j+2]=40+s*.6;col.data[j+3]=255;
+    }
+    l2.putImageData(col,lc.width-1,0);
+    const now=performance.now();
+    if(now-lastT>300){lastT=now;lShow(analyze(d,sr))}
+  }
+  requestAnimationFrame(lLoop);
+}
+// Analyze a saved recording (no microphone permission needed)
+function fft(re,im){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}
+  for(let len=2;len<=n;len<<=1){
+    const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a),h=len>>1;
+    for(let i=0;i<n;i+=len){let cr=1,ci=0;
+      for(let j=0;j<h;j++){const u=i+j,w=u+h,tr=re[w]*cr-im[w]*ci,ti=re[w]*ci+im[w]*cr;
+        re[w]=re[u]-tr;im[w]=im[u]-ti;re[u]+=tr;im[u]+=ti;const nr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=nr}}
+  }
+}
+function lSpec(buf){
+  const sr=buf.sampleRate,x=buf.getChannelData(0),n=8192,len=x.length,W=lc.width;
+  if(len<n*2)return null;
+  const win=Float64Array.from({length:n},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/(n-1)));
+  const re=new Float64Array(n),im=new Float64Array(n),hop=(len-n)/(W-1),cols=[],en=[];
+  for(let c=0;c<W;c++){
+    const o=Math.floor(c*hop);
+    for(let i=0;i<n;i++){re[i]=x[o+i]*win[i];im[i]=0}
+    fft(re,im);
+    const p=new Float32Array(n/2);let e=0;
+    for(let k=0;k<n/2;k++){p[k]=(re[k]*re[k]+im[k]*im[k])/((n/4)*(n/4));e+=p[k]}
+    cols.push(p);en.push(e);
+  }
+  const med=Float32Array.from(en).sort()[W>>1],avg=new Float32Array(n/2);let used=0;
+  cols.forEach((p,c)=>{if(en[c]>=med){used++;for(let k=0;k<n/2;k++)avg[k]+=p[k]}});
+  const dB=Float32Array.from(avg,a=>10*Math.log10(a/used+1e-14));
+  return {dB,sr,cols,n};
+}
+function lFile(buf){
+  const r=lSpec(buf);
+  if(!r){$('#lOut').textContent='That recording is too short. Use at least a few seconds.';return}
+  const W=lc.width,H=lc.height,n=r.n,img=l2.createImageData(W,H);
+  for(let c=0;c<W;c++)for(let y=0;y<H;y++){
+    const k=Math.min(n/2-1,Math.floor((H-1-y)/H*5000/(r.sr/2)*(n/2))),db=10*Math.log10(r.cols[c][k]+1e-14),
+    sv=Math.max(0,Math.min(255,(db+100)/70*255)),j=(y*W+c)*4;
+    img.data[j]=sv;img.data[j+1]=sv*.85;img.data[j+2]=40+sv*.6;img.data[j+3]=255;
+  }
+  l2.putImageData(img,0,0);
+  lShow(analyze(r.dB,r.sr));
+}
+$('#lPick').onclick=()=>{if(window.Android&&Android.pickAudio)Android.pickAudio();else $('#lFile').click()};
+async function onPicked(m){
+  if(m!=='ok'){$('#lOut').textContent='Could not read that file.';return}
+  if(lOn)lStop();
+  try{
+    if(!ctx)init();
+    const r=await fetch('https://skyear.local/picked');
+    lFile(await ctx.decodeAudioData(await r.arrayBuffer()));
+  }catch(e){$('#lOut').textContent='Could not read that file. Try an m4a, mp3, wav, or ogg recording.'}
+}
+$('#lFile').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(lOn)lStop();
+  let b;
+  try{if(!ctx)init();b=await ctx.decodeAudioData(await f.arrayBuffer())}
+  catch(err){$('#lOut').textContent='Could not read that file. Try an m4a, mp3, wav, or ogg recording.';e.target.value='';return}
+  lFile(b);e.target.value='';
+};
+$('#lGo').onclick=()=>lOn?lStop():lStart();
+$('#lFr').onclick=()=>{lFroze=!lFroze;$('#lFr').textContent=lFroze?'Resume':'Freeze'};
+$('#lUse').onclick=()=>{
+  const r=lastA;if(!r||!r.mt)return;
+  const a=r.mt[0].a;
+  P.forEach((p,j)=>v[p[0]]=a[j]);
+  v.rpm=Math.max(1000,Math.min(30000,Math.round(r.f0*60/(v.blades*(1-.12*v.load)))));
+  v.harm=Math.max(3,Math.min(14,r.count));v.roll=Math.round(r.roll*100)/100;
+  lStop();tab('syn');build();
+};
+
+// ---- Overhead (ADS-B, Android app only) ----
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cmp=b=>['N','NE','E','SE','S','SW','W','NW'][Math.round(b/45)%8];
+$('#oRad').oninput=()=>$('#oR').textContent=$('#oRad').value+' nm';
+$('#oR').textContent=$('#oRad').value+' nm';
+$('#oGo').onclick=()=>{
+  if(!window.Android){$('#oOut').textContent='This works in the Android app only.';return}
+  $('#oOut').textContent='Getting your location and nearby aircraft...';
+  Android.requestOverhead(+$('#oRad').value);
+};
+function onOverheadError(m){$('#oOut').textContent=m}
+function onOverhead(js){
+  const r=JSON.parse(js),o=$('#oOut');
+  const ac=r.ac.slice().sort((a,b)=>a.distM-b.distM).slice(0,12);
+  if(!ac.length){o.textContent='No aircraft reported within that radius right now.';return}
+  o.innerHTML=ac.map(a=>{
+    const alt=typeof a.altFt==='number'?a.altFt:null,el=alt!==null?Math.round(Math.atan2(alt*.3048,a.distM)*180/Math.PI):null;
+    const parts=[(a.distM/1000).toFixed(1)+' km '+cmp(a.bearing)+' ('+Math.round(a.bearing)+'°)'];
+    if(alt!==null)parts.push(alt.toLocaleString()+' ft');else if(a.altFt==='ground')parts.push('on ground');
+    if(a.gs>0)parts.push(Math.round(a.gs)+' kt');
+    if(el!==null)parts.push(el+'° above horizon');
+    return '<p><b>'+esc(a.flight||a.hex)+'</b> '+esc(a.type||'?')+(a.reg?' '+esc(a.reg):'')+'<br>'+esc(parts.join(', '))+'</p>';
+  }).join('')+'<p class="mut">'+r.ac.length+' aircraft reported. Positions are a few seconds old.</p>';
+}
+
+// ---- Recording and Library (Android app only) ----
+let rT=null,rOn=false,cur=null,delT=null;
+const CLIP='https://skyear.local/clips/';
+$('#rGo').onclick=()=>{
+  if(!window.Android){$('#rSt').textContent='Recording works in the Android app only.';return}
+  if(rOn){Android.stopRecording();$('#rSt').textContent='Finishing up and saving...';return}
+  $('#rSt').textContent='Starting...';
+  Android.startRecording(+$('#oRad').value);
+};
+function recReset(){rOn=false;clearInterval(rT);$('#ptLive').textContent='';$('#rGo').textContent='Start recording';$('#rLv').style.width='0'}
+function onRecState(m){
+  if(m==='started'){
+    rOn=true;ptLog=[];ptLast=0;ridLog=[];ridLogT=0;if(ridOn)ridSample();const t0=Date.now();$('#rGo').textContent='Stop recording';
+    rT=setInterval(()=>{$('#rSt').textContent='Recording '+Math.floor((Date.now()-t0)/1000)+' s'},500);
+  }else{recReset();$('#rSt').textContent=m.replace(/^error:/,'')}
+}
+function onRecLevel(v){$('#rLv').style.width=Math.min(100,Math.round(Math.sqrt(+v)*100))+'%'}
+async function onClipSaved(id){
+  recReset();$('#rSt').textContent='Saved. Analyzing...';
+  try{await analyzeClip(id,ridLog.length?ridLog.slice():null,{decl:ptDecl,mode:+$('#ptMode').value,samples:ptLog.slice()});$('#rSt').textContent='Saved to the Library.'}
+  catch(e){$('#rSt').textContent='Saved to the Library, but analysis failed.'}
+}
+function onExport(m){const e=$('#cMsg');if(e)e.textContent=m}
+
+function ptAt(pt,T){let b=null,d=1e12;for(const q of pt.samples){const x=Math.abs(q.t-T);if(x<d){d=x;b=q}}return d<=3000?b:null}
+function aimOf(pt,q){const m2=pt.mode===2;return{az:((m2?q.azm2:q.azm)+(pt.decl||0)+360)%360,el:m2?q.el2:q.el}}
+function angSep(a1,e1,a2,e2){const p=Math.PI/180,c=Math.sin(e1*p)*Math.sin(e2*p)+Math.cos(e1*p)*Math.cos(e2*p)*Math.cos((a1-a2)*p);return Math.acos(Math.max(-1,Math.min(1,c)))/p}
+function sources(m){
+  if(m.lat==null||!m.snaps)return [];
+  const c=343,kx=111320*Math.cos(m.lat*Math.PI/180),ky=110540,by={};
+  m.snaps.forEach(s=>(s.ac||[]).forEach(a=>{
+    if(a.lat==null||a.lon==null||!a.hex)return;
+    (by[a.hex]=by[a.hex]||[]).push({t:s.t,x:(a.lon-m.lon)*kx,y:(a.lat-m.lat)*ky,
+      z:typeof a.altFt==='number'?a.altFt*.3048:0,v:a.gs>0?a.gs*.51444:0,tr:(a.track||0)*Math.PI/180,a});
+  }));
+  const pos=(e,T)=>{const dt=(T-e.t)/1000;return{x:e.x+e.v*dt*Math.sin(e.tr),y:e.y+e.v*dt*Math.cos(e.tr),z:e.z}};
+  const t0=m.startMs,t1=m.startMs+m.durationMs,out=[];
+  const pt=m.point&&m.point.samples&&m.point.samples.length?m.point:null;
+  for(const hex in by){
+    const L=by[hex],errs=[];let best=null;
+    for(let T=t0;T<=t1;T+=1000){
+      let e=L[0];for(const q of L)if(Math.abs(q.t-T)<Math.abs(e.t-T))e=q;
+      const p0=pos(e,T),R0=Math.hypot(p0.x,p0.y,p0.z),p=pos(e,T-R0/c*1000),R=Math.hypot(p.x,p.y,p.z);
+      const el=Math.atan2(p.z,Math.hypot(p.x,p.y))*180/Math.PI;
+      if(pt){const sm=ptAt(pt,T);if(sm){const A=aimOf(pt,sm);errs.push(angSep(A.az,A.el,(Math.atan2(p.x,p.y)*180/Math.PI+360)%360,el))}}
+      if(!best||R<best.minR)best={hex,minR:R,atS:Math.round((T-t0)/1000),el:Math.round(el),
+        flight:e.a.flight,type:e.a.type,reg:e.a.reg,altFt:e.a.altFt,gs:e.a.gs};
+    }
+    if(errs.length){errs.sort((a,b)=>a-b);best.aimErr=Math.round(errs[errs.length>>1])}
+    out.push(best);
+  }
+  return out.sort((a,b)=>a.minR-b.minR).slice(0,5);
+}
+
+async function clipBuffer(id){
+  if(!ctx)init();
+  const r=await fetch(CLIP+id+'.wav');
+  return ctx.decodeAudioData(await r.arrayBuffer());
+}
+async function analyzeClip(id,rid,pt){
+  const buf=await clipBuffer(id),r=lSpec(buf),m=JSON.parse(Android.getClip(id));
+  if(!r)m.analysis={quiet:1};
+  else{
+    const a=analyze(r.dB,r.sr);
+    m.analysis=a.quiet?{quiet:1}:{f0:a.f0,count:a.count,slope:a.slope,cl:a.cl,match:a.mt?a.mt.map(x=>x.n):null};
+  }
+  if(rid)m.rid=rid;
+  if(pt&&pt.samples.length)m.point=pt;
+  m.candidates=sources(m);
+  Android.saveClip(id,JSON.stringify(m));
+  return m;
+}
+
+const LBL={aircraft:'aircraft',drone:'drone',other:'other'};
+const fmtT=ms=>new Date(ms).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+function topLine(m){
+  const c=(m.candidates||[])[0];
+  if(m.lat==null)return 'No location, so no aircraft tags';
+  if(!c)return 'No aircraft found nearby';
+  return esc((c.type||'?')+' '+(c.flight||c.hex))+', closest '+(c.minR/1000).toFixed(1)+' km'+(m.analysis&&m.analysis.f0?', '+Math.round(m.analysis.f0)+' Hz':'');
+}
+function libList(){
+  const o=$('#cList');$('#cDet').innerHTML='';
+  if(!window.Android){o.textContent='The library works in the Android app only.';return}
+  let a=[];try{a=JSON.parse(Android.listClips())}catch(e){}
+  if(!a.length){o.textContent='No clips yet. Record one from the Field tab.';return}
+  o.innerHTML='<div class="stack">'+a.map(m=>'<button data-id="'+esc(m.id)+'">'+esc(fmtT(m.startMs))+', '+Math.round(m.durationMs/1000)+' s<br><small>'+topLine(m)+' · '+(LBL[m.label]||'not labeled')+'</small></button>').join('')+'</div>';
+}
+$('#cList').onclick=e=>{const b=e.target.closest('button');if(b)libOpen(b.dataset.id)};
+
+function clipHtml(m){
+  const an=m.analysis;let h='<div class="res"><p><b>'+esc(fmtT(m.startMs))+'</b>, '+Math.round(m.durationMs/1000)+' s'+(m.source?', mic: '+esc(m.source):'')+'</p>';
+  h+='<audio id="cAu" controls style="width:100%"></audio>';
+  h+='<label><span>Note</span><input type="text" id="cNote" value="'+esc(m.note||'')+'" style="grid-column:1/3;font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--fg)"></label>';
+  h+='<label><span>What was it?</span><select id="cLab" style="grid-column:1/3"><option value="">Not labeled</option><option value="aircraft">Aircraft (not a drone)</option><option value="drone">Drone</option><option value="other">Other, not a drone</option></select></label>';
+  h+='<label id="cTypW"><span>Drone type</span><select id="cTyp" style="grid-column:1/3">'+TYPES.map(t=>'<option>'+t+'</option>').join('')+'</select></label>';
+  if(!an)h+='<p>Not analyzed yet.</p>';
+  else if(an.quiet)h+='<p>Too quiet to analyze.</p>';
+  else if(an.match)h+='<p>Fundamental '+Math.round(an.f0)+' Hz, '+an.count+' of 8 harmonics, '+an.slope.toFixed(1)+' dB per harmonic. Closest presets: '+esc(an.match.join(', '))+'.</p>';
+  else h+='<p>No clear repeating tone (strongest candidate '+Math.round(an.f0)+' Hz).</p>';
+  if(m.lat==null)h+='<p>No location was available, so there are no aircraft tags.</p>';
+  else if(!(m.candidates||[]).length)h+='<p>No aircraft were reported near you during this clip.</p>';
+  else{
+    h+='<p><b>Likely sources</b></p>'+m.candidates.map(c=>'<p>'+esc((c.type||'?')+' '+(c.flight||c.hex)+(c.reg?' '+c.reg:''))+'<br>closest '+(c.minR/1000).toFixed(1)+' km, '+c.atS+' s into the clip, '+c.el+'° above horizon'+(typeof c.altFt==='number'?', '+c.altFt.toLocaleString()+' ft':'')+(c.aimErr!=null?', about '+c.aimErr+'° off from where you pointed':'')+'</p>').join('');
+    h+='<p class="mut">Estimated from aircraft snapshots about every 15 seconds, allowing for sound travel time and assuming straight flight in between. Treat the top match as likely, not certain.</p>';
+  }
+  h+=ptHtml(m);
+  h+=ridHtml(m);
+  h+='</div><div class="stack"><button data-a="an">Show spectrogram on Listen tab</button><button data-a="syn">Copy this sound to Synth</button><button data-a="re">Re-run analysis</button><button data-a="ex">Export to Downloads</button><button data-a="del">Delete</button></div><p id="cMsg" class="mut"></p>';
+  return h;
+}
+function useInSynth(m){
+  const an=m.analysis;if(!an||!an.match)return false;
+  const a=LIB.drones[an.match[0]]||LIB.fp[an.match[0]];if(!a)return false;
+  P.forEach((p,j)=>v[p[0]]=a[j]);
+  v.rpm=Math.max(1000,Math.min(30000,Math.round(an.f0*60/(v.blades*(1-.12*v.load)))));
+  v.harm=Math.max(3,Math.min(14,an.count));
+  v.roll=Math.round(Math.max(.3,Math.min(.95,Math.pow(10,an.slope/20)))*100)/100;
+  tab('syn');build();return true;
+}
+async function libOpen(id){
+  const d=$('#cDet');d.innerHTML='<p>Loading...</p>';
+  let m;try{m=JSON.parse(Android.getClip(id))}catch(e){d.textContent='Could not open that clip.';return}
+  cur={id,m};d.innerHTML=clipHtml(m);d.scrollIntoView();
+  fetch(CLIP+id+'.wav').then(r=>r.blob()).then(b=>{const a=$('#cAu');if(a)a.src=URL.createObjectURL(b)}).catch(()=>{});
+  $('#cLab').value=m.label||'';$('#cTyp').value=m.dtype||TYPES[0];
+  const tg=()=>{$('#cTypW').style.display=$('#cLab').value==='drone'?'':'none'};tg();
+  $('#cLab').onchange=ev=>{cur.m.label=ev.target.value;if(cur.m.label==='drone')cur.m.dtype=$('#cTyp').value;tg();Android.saveClip(id,JSON.stringify(cur.m))};
+  $('#cTyp').onchange=ev=>{cur.m.dtype=ev.target.value;Android.saveClip(id,JSON.stringify(cur.m))};
+  $('#cNote').onchange=ev=>{cur.m.note=ev.target.value;Android.saveClip(id,JSON.stringify(cur.m))};
+}
+$('#cDet').onclick=async e=>{
+  const b=e.target.closest('button');if(!b||!cur)return;
+  const a=b.dataset.a,id=cur.id,msg=$('#cMsg');
+  if(a==='an'){try{const buf=await clipBuffer(id);tab('lsn');lFile(buf)}catch(err){msg.textContent='Could not load the audio.'}}
+  else if(a==='syn'){if(!useInSynth(cur.m))msg.textContent='No clear tone to copy. Try Re-run analysis, or a clip with a steady sound.'}
+  else if(a==='re'){msg.textContent='Analyzing...';try{await analyzeClip(id);libOpen(id)}catch(err){msg.textContent='Analysis failed.'}}
+  else if(a==='ex'){msg.textContent='Exporting...';Android.exportClip(id)}
+  else if(a==='del'){
+    if(b.dataset.armed){clearTimeout(delT);Android.deleteClip(id);cur=null;libList()}
+    else{b.dataset.armed=1;b.textContent='Tap again to delete';delT=setTimeout(()=>{b.dataset.armed='';b.textContent='Delete'},3000)}
+  }
+};
+
+// ---- Remote ID (ASTM F3411 / Open Drone ID), Android app only ----
+const UAT=['Not declared','Aeroplane','Multirotor or helicopter','Gyroplane','Hybrid lift','Ornithopter','Glider','Kite','Free balloon','Captive balloon','Airship','Parachute','Rocket','Tethered aircraft','Ground obstacle','Other'];
+const IDT=['','serial number','registration ID','UTM UUID','session ID'];
+const RSTAT=['Status unknown','On ground','Airborne','Emergency','System failure'];
+let ridOn=false,ridU={},ridPhone=null,ridLog=[],ridLogT=0;
+function rtext(b,o,n){let t='';for(let i=o;i<o+n;i++){if(!b[i])break;t+=b[i]>=32&&b[i]<127?String.fromCharCode(b[i]):'?'}return t}
+function rmsg(b,o,u){
+  const t=b[o]>>4,i32=i=>b[o+i]|(b[o+i+1]<<8)|(b[o+i+2]<<16)|(b[o+i+3]<<24),u16=i=>b[o+i]|(b[o+i+1]<<8),alt=x=>x===0?null:x*.5-1000;
+  if(t===0){u.idType=b[o+1]>>4;u.uaType=b[o+1]&15;const id=rtext(b,o+2,20);if(id)u.id=id}
+  else if(t===1){
+    const f=b[o+1],mult=f&1,ew=(f>>1)&1;
+    u.status=f>>4;u.heightRef=(f>>2)&1?'ground':'takeoff';
+    const tr=b[o+2]+(ew?180:0);u.track=tr<=360?tr:null;
+    u.speed=b[o+3]===255?null:(mult?b[o+3]*.75+255*.25:b[o+3]*.25);
+    const vs=(b[o+4]<<24)>>24;u.vspeed=vs===63?null:vs*.5;
+    const la=i32(5),lo=i32(9);if(la||lo){u.lat=la/1e7;u.lon=lo/1e7}
+    u.altBaro=alt(u16(13));u.altGeo=alt(u16(15));u.height=alt(u16(17));
+  }
+  else if(t===4){const la=i32(2),lo=i32(6);if(la||lo){u.opLat=la/1e7;u.opLon=lo/1e7}}
+  else if(t===5){const id=rtext(b,o+2,20);if(id)u.operatorId=id}
+  else if(t===3){const d=rtext(b,o+2,23);if(d)u.selfId=d}
+}
+// hex = bytes starting at the message counter: [counter][one message or a message pack]
+function ridParse(hex){
+  const b=[];for(let i=0;i+1<hex.length;i+=2)b.push(parseInt(hex.substr(i,2),16));
+  const u={};if(b.length<26)return u;
+  if(b[1]>>4===15){const sz=b[2],n=b[3];for(let k=0;k<n&&sz===25;k++){const o=4+k*sz;if(o+25<=b.length)rmsg(b,o,u)}}
+  else rmsg(b,1,u);
+  return u;
+}
+function llDelta(a,b,c,d){const p=Math.PI/180,x=(d-b)*p*Math.cos((a+c)/2*p),y=(c-a)*p;return{m:Math.hypot(x,y)*6371000,br:(Math.atan2(x,y)/p+360)%360}}
+const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
+$('#idGo').onclick=()=>{
+  if(!window.Android||!Android.startRid){$('#idSt').textContent='Remote ID scanning works in the Android app only.';return}
+  if(ridOn){Android.stopRid();return}
+  $('#idSt').textContent='Starting...';Android.startRid();
+};
+function onRidState(m){
+  if(m==='started'){ridOn=true;ridU={};$('#idGo').textContent='Stop scanning';$('#idSt').textContent='Scanning...';$('#idList').textContent='No broadcasting drones heard yet.'}
+  else if(m.startsWith('info:'))$('#idSt').textContent='Scanning. '+m.slice(5);
+  else if(m==='stopped'){ridOn=false;$('#idGo').textContent='Start scanning';$('#idSt').textContent='Scanning stopped.'}
+  else{ridOn=false;$('#idGo').textContent='Start scanning';$('#idSt').textContent=m.replace(/^error:/,'')}
+}
+function ridSample(){
+  ridLogT=Date.now();
+  ridLog.push({t:ridLogT,u:Object.values(ridU).filter(x=>ridLogT-x.seen<15000).map(x=>({id:x.id,addr:x.addr,uaType:x.uaType,lat:x.lat,lon:x.lon,height:x.height,speed:x.speed,rssi:x.rssi}))});
+}
+function ridAdd(o){
+  const u=ridU[o.a]||(ridU[o.a]={addr:o.a});
+  Object.assign(u,ridParse(o.h));u.src=o.s==='wifi'?'Wi-Fi':'Bluetooth';u.rssi=o.r;u.seen=o.t;
+}
+function onRidBatch(js){
+  const r=JSON.parse(js);
+  if(r.lat!=null)ridPhone={lat:r.lat,lon:r.lon};
+  r.obs.forEach(ridAdd);
+  ridRender();
+  if(rOn&&Date.now()-ridLogT>5000)ridSample();
+}
+function ridRender(){
+  const now=Date.now();
+  for(const k in ridU)if(now-ridU[k].seen>60000)delete ridU[k];
+  const L=Object.values(ridU).sort((a,b)=>b.seen-a.seen),o=$('#idList');
+  if(!L.length){o.textContent=ridOn?'No broadcasting drones heard yet.':'';return}
+  o.innerHTML=L.map(u=>{
+    const name=u.id?esc(u.id):'Unknown ID ('+esc(String(u.addr).slice(-5))+')';
+    const kind=[u.uaType!=null?UAT[u.uaType]:null,u.idType?IDT[u.idType]:null].filter(Boolean).join(', ');
+    const bits=[];
+    if(u.status!=null)bits.push(RSTAT[u.status]||'Status unknown');
+    if(u.height!=null)bits.push(Math.round(u.height)+' m '+(u.heightRef==='ground'?'above ground':'above takeoff'));
+    else if(u.altGeo!=null)bits.push(Math.round(u.altGeo)+' m altitude');
+    if(u.speed!=null)bits.push(u.speed.toFixed(1)+' m/s'+(u.track!=null?', heading '+Math.round(u.track)+'°':''));
+    let pos='';
+    if(u.lat!=null&&ridPhone){const d=llDelta(ridPhone.lat,ridPhone.lon,u.lat,u.lon);pos=fmtD(d.m)+' '+cmp(d.br)+' of you'}
+    else if(u.lat!=null)pos='position received (your location is not known yet)';
+    if(u.opLat!=null&&ridPhone){const d=llDelta(ridPhone.lat,ridPhone.lon,u.opLat,u.opLon);pos+=(pos?'; ':'')+'operator point '+fmtD(d.m)+' away'}
+    return '<p><b>'+name+'</b>'+(kind?'<br>'+esc(kind):'')+(bits.length?'<br>'+esc(bits.join(', ')):'')+(pos?'<br>'+esc(pos):'')+'<br><small>'+u.src+', signal '+u.rssi+' dBm, heard '+Math.max(0,Math.round((now-u.seen)/1000))+' s ago</small></p>';
+  }).join('');
+}
+function ridSummary(m){
+  if(!m.rid)return null;
+  const by={};
+  m.rid.forEach(s=>s.u.forEach(x=>{
+    const k=x.id||x.addr,e=by[k]||(by[k]={id:x.id,addr:x.addr,type:x.uaType,minD:null});
+    if(x.lat!=null&&m.lat!=null){const d=llDelta(m.lat,m.lon,x.lat,x.lon).m;if(e.minD===null||d<e.minD)e.minD=d}
+  }));
+  return Object.values(by).sort((a,b)=>(a.minD===null?1e9:a.minD)-(b.minD===null?1e9:b.minD));
+}
+function ridHtml(m){
+  const r=ridSummary(m);
+  if(r===null)return '<p class="mut">Remote ID scanning was not running during this clip.</p>';
+  if(!r.length)return '<p>Remote ID scanning was on, and no drones were heard broadcasting during this clip.</p>';
+  return '<p><b>Broadcasting drones heard</b></p>'+r.map(e=>'<p>'+esc(e.id||'Unknown ID ('+String(e.addr).slice(-5)+')')+(e.type!=null?' ('+esc(UAT[e.type])+')':'')+'<br>'+(e.minD!==null?'closest about '+fmtD(e.minD):'position not received')+'</p>').join('')+'<p class="mut">A broadcasting drone nearby is a good hint to label this clip as a drone.</p>';
+}
+
+// ---- Phone pointing (compass and tilt) ----
+let ptLog=[],ptDecl=null,ptLast=0,ptNow=null;
+// r = rotation matrix (device to east/north/up). Mode 1: back of phone. Mode 2: top edge.
+function ptCalc(r,mode){
+  const E=mode===2?r[1]:-r[2],N=mode===2?r[4]:-r[5],U=mode===2?r[7]:-r[8];
+  return{az:(Math.atan2(E,N)*180/Math.PI+360)%360,el:Math.asin(Math.max(-1,Math.min(1,U)))*180/Math.PI};
+}
+function onOrient(js){
+  const o=JSON.parse(js);
+  if(o.d!=null)ptDecl=o.d;
+  const a=ptCalc(o.r,1),b=ptCalc(o.r,2);
+  ptNow={az:a.az,el:a.el,az2:b.az,el2:b.el,acc:o.a};
+  ptRender();
+  if(rOn&&o.t-ptLast>=500){
+    ptLast=o.t;
+    ptLog.push({t:o.t,azm:+a.az.toFixed(1),el:+a.el.toFixed(1),azm2:+b.az.toFixed(1),el2:+b.el.toFixed(1),acc:o.a});
+  }
+}
+function onOrientError(m){$('#ptLive').textContent=m}
+function ptRender(){
+  const mode=+$('#ptMode').value,az=((mode===2?ptNow.az2:ptNow.az)+(ptDecl||0)+360)%360,el=mode===2?ptNow.el2:ptNow.el;
+  let t='Pointing '+Math.round(az)+'° '+cmp(az)+', '+Math.round(Math.abs(el))+'° '+(el>=0?'above':'below')+' the horizon';
+  if(ptDecl===null)t+=' (magnetic north until your location is known)';
+  if(ptNow.acc<2)t+='. Compass accuracy is low: wave the phone in a figure 8 to calibrate.';
+  $('#ptLive').textContent=t;
+}
+function ptHtml(m){
+  const p=m.point;
+  if(!p||!p.samples.length)return '<p class="mut">No pointing data was recorded for this clip.</p>';
+  const m2=p.mode===2,az=p.samples.map(q=>((m2?q.azm2:q.azm)+(p.decl||0)+360)%360),el=p.samples.map(q=>m2?q.el2:q.el);
+  let sx=0,sy=0;az.forEach(a=>{sx+=Math.sin(a*Math.PI/180);sy+=Math.cos(a*Math.PI/180)});
+  const mean=(Math.atan2(sx,sy)*180/Math.PI+360)%360,lo=Math.round(Math.min(...el)),hi=Math.round(Math.max(...el));
+  let h='<p><b>Pointing</b><br>Mostly toward '+Math.round(mean)+'° '+cmp(mean)+', '+lo+'° to '+hi+'° above the horizon ('+(p.decl==null?'magnetic north':'true north')+', '+(m2?'top edge':'back of phone')+')</p>';
+  const best=(m.candidates||[]).filter(c=>c.aimErr!=null).sort((a,b)=>a.aimErr-b.aimErr)[0];
+  if(best)h+='<p>Closest to where you pointed: '+esc((best.type||'?')+' '+(best.flight||best.hex))+', about '+best.aimErr+'° off.</p>';
+  return h;
+}
+
+// ---- Remembered settings (saved on the phone, kept between launches) ----
+function prefGet(k){
+  try{if(window.Android&&Android.getPref)return Android.getPref(k)}catch(e){}
+  try{return localStorage.getItem(k)||''}catch(e){return ''}
+}
+function prefSet(k,val){
+  try{if(window.Android&&Android.setPref){Android.setPref(k,val);return}}catch(e){}
+  try{localStorage.setItem(k,val)}catch(e){}
+}
+(()=>{
+  const sel=$('#ptMode'),saved=prefGet('ptMode');
+  if(saved==='1'||saved==='2')sel.value=saved;
+  sel.addEventListener('change',()=>{prefSet('ptMode',sel.value);if(ptNow)ptRender()});
+})();
+</script>
+</body>
+</html>
