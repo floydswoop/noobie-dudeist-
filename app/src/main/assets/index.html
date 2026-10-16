@@ -27,7 +27,19 @@ button:disabled{opacity:.45}
 #cbGo:focus-visible,.tabs #tOv:focus-visible{outline-color:var(--fl)}
 .stack{display:grid;gap:8px}.stack button{width:100%}.res p{margin:6px 0}
 select{font:inherit;font-weight:600;width:100%;min-height:44px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 10px;margin-bottom:4px}
-button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}.top h1{margin:0}
+#hlp{min-width:44px;padding:6px 14px}
+#oOut p[data-hex]{padding:4px 0}
+#gd{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+#gd[hidden]{display:none}
+.gc{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:16px;max-width:520px;width:100%;padding:18px;max-height:90vh;overflow:auto}
+.gc h2{font-size:24px;margin:2px 0 8px}.gc h2:focus{outline:none}
+.gc p{margin:0 0 10px;font-size:17px}
+.gstep{color:var(--mut);font-size:14px}
+.gdots{display:flex;gap:6px;margin:8px 0 14px}.gdots i{width:8px;height:8px;border-radius:50%;background:var(--bd)}.gdots i.on{background:var(--ac)}
+.gc .row{margin:0}
 canvas{width:100%;height:120px;display:block;background:#000;border-radius:8px}
 #ovh .rc{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin:0 0 14px}
 .rc .rch{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.rc .rch b{font-size:22px}.rc .rch span{color:var(--mut);text-align:right}
@@ -50,41 +62,43 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 </head>
 <body>
 <main>
-<h1>Sky Ear</h1>
-<div class="row tabs"><button id="tOv" class="sel">Field</button><button id="tSyn">Synth</button><button id="tQz">Quiz</button><button id="tLs">Listen</button><button id="tLb">Library</button></div>
-<section id="syn" hidden>
+<div class="top"><h1>Sky Ear</h1><button id="hlp" type="button" aria-label="Help and first-run guide">Help</button></div>
+<div id="sr" class="sr" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="row tabs" role="tablist" aria-label="Sections"><button id="tOv" class="sel" role="tab" aria-selected="true" aria-controls="ovh">Field</button><button id="tSyn" role="tab" aria-selected="false" aria-controls="syn">Synth</button><button id="tQz" role="tab" aria-selected="false" aria-controls="qz">Quiz</button><button id="tLs" role="tab" aria-selected="false" aria-controls="lsn">Listen</button><button id="tLb" role="tab" aria-selected="false" aria-controls="cls">Library</button></div>
+<section id="syn" role="tabpanel" aria-labelledby="tSyn" hidden>
 <div class="row"><button id="go" class="main">Start</button><button id="fly" disabled>Fly-by</button></div>
-<canvas id="sp" width="320" height="120"></canvas>
+<canvas id="sp" width="320" height="120" role="img" aria-label="Spectrogram of the synthesized sound, 0 to 5 kilohertz, newest on the right"></canvas>
 <div class="cap">Spectrogram, 0 to 5 kHz, newest on the right</div>
 <select id="lib" aria-label="Sound library"><option value="">Choose a sound…</option></select>
 <div class="cap">Drone settings are estimates from typical hover specs, not recordings. Adjust the sliders to match real recordings.</div>
 <div id="ctl"></div>
 </section>
-<section id="qz" hidden>
+<section id="qz" role="tabpanel" aria-labelledby="tQz" hidden>
 <p class="mut">Up to 20 sounds. Say whether each is a drone, then name the type. Names stay hidden until you answer. Use headphones.</p>
 <label><span>Sounds to use</span><select id="qSrc" style="grid-column:1/3"><option value="syn">Synthesized</option><option value="real">My recordings (labeled in the Library)</option><option value="mix">Both</option></select></label>
-<div id="qBox"><div class="stack"><button data-a="start" class="main">Start quiz</button></div></div>
+<div id="qBox" aria-live="polite"><div class="stack"><button data-a="start" class="main">Start quiz</button></div></div>
 </section>
-<section id="lsn" hidden>
+<section id="lsn" role="tabpanel" aria-labelledby="tLs" hidden>
 <p class="mut">Measures a sound with your microphone. Audio is analyzed on your phone and is not recorded or uploaded. Hold the phone toward the source, away from wind.</p>
 <div class="row"><button id="lGo" class="main">Start listening</button><button id="lFr" disabled>Freeze</button></div>
 <button id="lPick" style="width:100%;margin-bottom:12px">Analyze a recording instead</button>
 <input type="file" id="lFile" accept="audio/*" hidden>
-<canvas id="lc" width="320" height="120"></canvas>
+<canvas id="lc" width="320" height="120" role="img" aria-label="Spectrogram of the microphone sound, 0 to 5 kilohertz, newest on the right. The measured values are listed below it."></canvas>
 <div class="cap">Spectrogram, 0 to 5 kHz, newest on the right</div>
 <div id="lOut" class="res"></div>
 <div class="stack"><button id="lUse" hidden>Copy best match to Synth</button></div>
 </section>
-<section id="ovh">
-<p class="mut">One tap listens through the microphone, checks public ADS-B data for aircraft near you every 15 seconds, and scans for drones broadcasting Remote ID. This sends your approximate location to the data service (api.adsb.lol). Android app only.</p>
+<section id="ovh" role="tabpanel" aria-labelledby="tOv">
+<p class="mut">One tap listens through the microphone, checks public ADS-B data for aircraft near you every 15 seconds, and scans for drones broadcasting Remote ID. This sends your approximate location to the aircraft data service (api.adsb.lol) and, rounded to about 1 km, to the weather service (open-meteo.com). Android app only.</p>
 <div class="row"><button id="cbGo" class="main">Start scan</button></div>
 <div id="cbOut" class="res"></div>
-<label><span>Search radius</span><b id="oR"></b><input type="range" id="oRad" min="5" max="50" step="5" value="15"></label>
+<div class="rc" id="wxCard" role="region" aria-label="Weather at your location" hidden></div>
+<label><span>Search radius</span><b id="oR"></b><input type="range" id="oRad" min="5" max="50" step="5" value="15" aria-valuetext="15 nautical miles"></label>
 <canvas id="rdr" width="640" height="640" role="img" aria-label="Radar of nearby aircraft and the direction the phone points"></canvas>
 <div class="row"><button id="rdMode">Radar: pointing up</button></div>
 <p class="cap" id="rdCap"></p>
 <p class="cap" id="rdDbg"></p>
-<div class="rc" id="rdCard" hidden></div>
+<div class="rc" id="rdCard" role="region" aria-label="Aircraft details" tabindex="-1" hidden></div>
 <h2 style="font-size:20px;margin:20px 0 6px">Aircraft overhead</h2>
 <div class="row"><button id="oGo" class="main">What's overhead</button></div>
 <div id="oOut" class="res"></div>
@@ -96,17 +110,18 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <h2 style="font-size:20px;margin:20px 0 6px">Record a clip</h2>
 <p class="mut">Records audio and tags it with nearby aircraft from ADS-B, using the search radius above. Keep the screen on and point the phone toward the sound. Stops by itself after 2 minutes.</p>
 <div class="row"><button id="rGo" class="main">Start recording</button></div>
-<div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:8px"><div id="rLv" style="height:100%;width:0;background:var(--ac)"></div></div>
+<div aria-hidden="true" style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:8px"><div id="rLv" style="height:100%;width:0;background:var(--ac)"></div></div>
 <label><span>Aim with</span><select id="ptMode" style="grid-column:1/3"><option value="1">Back of phone (like a camera)</option><option value="2">Top edge of phone</option></select></label>
 <div id="ptLive" class="res"></div>
 <div id="rSt" class="res"></div>
 </section>
-<section id="cls" hidden>
+<section id="cls" role="tabpanel" aria-labelledby="tLb" hidden>
 <p class="mut">Clips you recorded, with analysis and likely aircraft sources. They are stored on this phone.</p>
 <div id="cList"></div>
 <div id="cDet"></div>
 </section>
 </main>
+<div id="gd" role="dialog" aria-modal="true" aria-labelledby="gdT" hidden><div class="gc"><div class="gstep" id="gdS"></div><h2 id="gdT" tabindex="-1"></h2><div id="gdB"></div><div class="gdots" id="gdD" aria-hidden="true"></div><div class="row"><button id="gdBk" type="button">Back</button><button id="gdSk" type="button">Skip</button><button id="gdNx" type="button" class="main">Next</button></div></div></div>
 <script>
 // Low-light (dark) theme draws spectrograms in pure amber so the screen stays easy on night-adapted eyes.
 let LL=false;
@@ -115,6 +130,14 @@ function spx(d,j,s){if(LL){d[j]=s;d[j+1]=s*.55;d[j+2]=s*.04}else{d[j]=s;d[j+1]=s
 try{llUpdate();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',llUpdate)}catch(e){}
 
 const $=s=>document.querySelector(s);
+// Screen reader announcements: one polite live region. sayChange() speaks only when its key changes,
+// so a scan that repeats every 15 s does not repeat the same sentence.
+let sayLast='',sayT=0;const sayKeys={};
+function say(t){
+  const e=$('#sr');if(!e||!t||(t===sayLast&&Date.now()-sayT<8000))return;
+  sayLast=t;sayT=Date.now();e.textContent='';setTimeout(()=>{e.textContent=t},60);
+}
+function sayChange(k,key,t){if(sayKeys[k]===key)return;sayKeys[k]=key;say(t)}
 // key,label,min,max,step,default,unit,rebuild
 const P=[
 ['motors','Motors',1,8,1,4,'',1],
@@ -162,7 +185,7 @@ P.forEach(([k,l,mn,mx,st,d,u,rb])=>{
   const w=document.createElement('label');
   w.innerHTML=`<span>${l}</span><b></b><input type="range" min="${mn}" max="${mx}" step="${st}" value="${d}">`;
   const i=w.querySelector('input'),o=w.querySelector('b');
-  const show=()=>o.textContent=v[k]+u;
+  const show=()=>{o.textContent=v[k]+u;i.setAttribute('aria-valuetext',v[k]+u.replace(/^ ?%$/,' percent'))};
   i.oninput=()=>{v[k]=+i.value;show();rb?build():update()};
   els[k]={i,show};show();$('#ctl').appendChild(w);
 });
@@ -373,7 +396,7 @@ function tab(w){
   qStopSrc();
   if(Q&&Q.backup){Object.assign(v,Q.backup);Q.backup=null;if(ctx)build()}
   ['syn','qz','lsn','ovh','cls'].forEach(id=>$('#'+id).hidden=id!==w);
-  [['tSyn','syn'],['tQz','qz'],['tLs','lsn'],['tOv','ovh'],['tLb','cls']].forEach(([b,id])=>$('#'+b).classList.toggle('sel',id===w));
+  [['tSyn','syn'],['tQz','qz'],['tLs','lsn'],['tOv','ovh'],['tLb','cls']].forEach(([b,id])=>{$('#'+b).classList.toggle('sel',id===w);$('#'+b).setAttribute('aria-selected',id===w?'true':'false')});
   on=false;if(ctx)mg.gain.setTargetAtTime(0,ctx.currentTime,.05);
   $('#go').textContent='Start';$('#fly').disabled=true;
   if(w!=='lsn'&&lOn)lStop();
@@ -546,26 +569,27 @@ $('#lUse').onclick=()=>{
 // ---- Overhead (ADS-B, Android app only) ----
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cmp=b=>['N','NE','E','SE','S','SW','W','NW'][Math.round(b/45)%8];
-$('#oRad').oninput=()=>$('#oR').textContent=$('#oRad').value+' nm';
-$('#oR').textContent=$('#oRad').value+' nm';
+const radText=()=>{const n=$('#oRad').value;$('#oR').textContent=n+' nm';$('#oRad').setAttribute('aria-valuetext',n+' nautical miles')};
+$('#oRad').oninput=radText;radText();
 $('#oGo').onclick=()=>{
   if(!window.Android){$('#oOut').textContent='This works in the Android app only.';return}
   $('#oOut').textContent='Getting your location and nearby aircraft...';
   Android.requestOverhead(+$('#oRad').value);
 };
-function onOverheadError(m){$('#oOut').textContent=m;ovErr=m;cbOvDone();cbRender()}
+function onOverheadError(m){say(m);$('#oOut').textContent=m;ovErr=m;cbOvDone();cbRender()}
 function onOverhead(js){
   const r=JSON.parse(js),o=$('#oOut');
   const ac=r.ac.slice().sort((a,b)=>a.distM-b.distM).slice(0,12);
-  ovErr=null;ovLast={t:Date.now(),all:r.ac.length,near:ac[0]||null};rdFix=r.fix||null;rdSet(r.ac);cbOvDone();cbRender();
-  if(!ac.length){o.textContent='No aircraft reported within that radius right now.';return}
+  ovErr=null;ovLast={t:Date.now(),all:r.ac.length,near:ac[0]||null};rdFix=r.fix||null;if(r.wx)wxSet(r.wx);rdSet(r.ac);cbOvDone();cbRender();
+  if(!ac.length){o.textContent='No aircraft reported within that radius right now.';sayChange('air','none','No aircraft reported nearby.');return}
+  {const n=ac[0];sayChange('air',r.ac.length+':'+n.hex,r.ac.length+(r.ac.length===1?' aircraft':' aircraft')+' reported. Nearest: '+(n.flight||n.type||n.hex)+', '+(n.distM/1000).toFixed(1)+' kilometers '+cmp(n.bearing)+'.')}
   o.innerHTML=ac.map(a=>{
     const alt=typeof a.altFt==='number'?a.altFt:null,el=alt!==null?Math.round(Math.atan2(alt*.3048,a.distM)*180/Math.PI):null;
     const parts=[(a.distM/1000).toFixed(1)+' km '+cmp(a.bearing)+' ('+Math.round(a.bearing)+'°)'];
     if(alt!==null)parts.push(alt.toLocaleString()+' ft');else if(a.altFt==='ground')parts.push('on ground');
     if(a.gs>0)parts.push(Math.round(a.gs)+' kt');
     if(el!==null)parts.push(el+'° above horizon');
-    return '<p data-hex="'+esc(a.hex)+'"><b>'+esc(a.flight||a.hex)+'</b> '+esc(a.type||'?')+(a.reg?' '+esc(a.reg):'')+'<br>'+esc(parts.join(', '))+'</p>';
+    return '<p data-hex="'+esc(a.hex)+'" tabindex="0" role="button" aria-label="Details for '+esc((a.flight||a.hex)+', '+(a.type||'unknown type')+', '+parts.join(', '))+'"><b>'+esc(a.flight||a.hex)+'</b> '+esc(a.type||'?')+(a.reg?' '+esc(a.reg):'')+'<br>'+esc(parts.join(', '))+'</p>';
   }).join('')+'<p class="mut">'+r.ac.length+' aircraft reported. Positions are a few seconds old.</p>';
 }
 
@@ -582,14 +606,14 @@ $('#rGo').onclick=()=>{
 function recReset(){rOn=false;clearInterval(rT);$('#ptLive').textContent='';$('#rGo').textContent='Start recording';$('#rLv').style.width='0'}
 function onRecState(m){
   if(m==='started'){
-    rOn=true;ptLog=[];ptLast=0;ridLog=[];ridLogT=0;if(ridOn)ridSample();const t0=Date.now();$('#rGo').textContent='Stop recording';
+    say('Recording started');rOn=true;ptLog=[];ptLast=0;ridLog=[];ridLogT=0;if(ridOn)ridSample();const t0=Date.now();$('#rGo').textContent='Stop recording';
     rT=setInterval(()=>{$('#rSt').textContent='Recording '+Math.floor((Date.now()-t0)/1000)+' s'},500);
-  }else{recReset();$('#rSt').textContent=m.replace(/^error:/,'')}
+  }else{recReset();$('#rSt').textContent=m.replace(/^error:/,'');say($('#rSt').textContent)}
 }
 function onRecLevel(v){$('#rLv').style.width=Math.min(100,Math.round(Math.sqrt(+v)*100))+'%'}
 async function onClipSaved(id){
-  recReset();$('#rSt').textContent='Saved. Analyzing...';
-  try{await analyzeClip(id,ridLog.length?ridLog.slice():null,{decl:ptDecl,mode:+$('#ptMode').value,samples:ptLog.slice()});$('#rSt').textContent='Saved to the Library.'}
+  recReset();say('Clip saved. Analyzing.');$('#rSt').textContent='Saved. Analyzing...';
+  try{await analyzeClip(id,ridLog.length?ridLog.slice():null,{decl:ptDecl,mode:+$('#ptMode').value,samples:ptLog.slice()});$('#rSt').textContent='Saved to the Library.';say('Analysis done. Saved to the Library.')}
   catch(e){$('#rSt').textContent='Saved to the Library, but analysis failed.'}
 }
 function onExport(m){const e=$('#cMsg');if(e)e.textContent=m}
@@ -599,7 +623,7 @@ function aimOf(pt,q){const m2=pt.mode===2;return{az:((m2?q.azm2:q.azm)+(pt.decl|
 function angSep(a1,e1,a2,e2){const p=Math.PI/180,c=Math.sin(e1*p)*Math.sin(e2*p)+Math.cos(e1*p)*Math.cos(e2*p)*Math.cos((a1-a2)*p);return Math.acos(Math.max(-1,Math.min(1,c)))/p}
 function sources(m){
   if(m.lat==null||!m.snaps)return [];
-  const c=SOUND_C,kx=111320*Math.cos(m.lat*Math.PI/180),ky=110540,by={};
+  const c=soundSpeed(m.wx&&m.wx.tempC),kx=111320*Math.cos(m.lat*Math.PI/180),ky=110540,by={};
   m.snaps.forEach(s=>(s.ac||[]).forEach(a=>{
     if(a.lat==null||a.lon==null||!a.hex)return;
     (by[a.hex]=by[a.hex]||[]).push({t:s.t-(a.seenPos||0)*1000,x:(a.lon-m.lon)*kx,y:(a.lat-m.lat)*ky,
@@ -676,6 +700,7 @@ function clipHtml(m){
     h+='<p><b>Likely sources</b></p>'+m.candidates.map(c=>'<p>'+esc((c.type||'?')+' '+(c.flight||c.hex)+(c.reg?' '+c.reg:''))+'<br>closest '+(c.minR/1000).toFixed(1)+' km, '+c.atS+' s into the clip, '+c.el+'° above horizon'+(typeof c.altFt==='number'?', '+c.altFt.toLocaleString()+' ft':'')+(c.aimErr!=null?', about '+c.aimErr+'° off from where you pointed':'')+'</p>').join('');
     h+='<p class="mut">Estimated from aircraft snapshots about every 15 seconds, allowing for sound travel time and assuming straight flight in between. Treat the top match as likely, not certain.</p>';
   }
+  h+=wxClipHtml(m);
   h+=ptHtml(m);
   h+=ridHtml(m);
   h+='</div><div class="stack"><button data-a="an">Show spectrogram on Listen tab</button><button data-a="syn">Copy this sound to Synth</button><button data-a="re">Re-run analysis</button><button data-a="ex">Export to Downloads</button><button data-a="del">Delete</button></div><p id="cMsg" class="mut"></p>';
@@ -889,11 +914,12 @@ function cbRender(){
   if(!cbOn)return;
   const now=Date.now(),s=cbSummary({rec:rOn,micErr:cbMicErr,snd:cbSnd,ovErr,ov:ovLast,ridOn,ridErr,ridInfo,phone:ridPhone,now,
     rid:Object.values(ridU).filter(u=>now-u.seen<60000)});
+  sayChange('drone',s.drone,s.drone);
   $('#cbOut').innerHTML='<p><b>Sound</b><br>'+esc(s.sound)+'</p><p><b>Aircraft</b><br>'+esc(s.air)+'</p><p><b>Drone signals</b><br>'+esc(s.drone)+'</p>';
 }
 function setCbUi(on,label){
   $('#cbGo').textContent=label||(on?'Stop scan':'Start scan');
-  $('#tOv').textContent=on?'Field \u2022':'Field';
+  $('#tOv').textContent=on?'Field \u2022':'Field';$('#tOv').setAttribute('aria-label',on?'Field, scan running':'Field');
 }
 async function cbMicStart(){
   if(cbMic||cbMicBusy)return;
@@ -960,7 +986,7 @@ async function cbStart(){
   if(!cbOn||tok!==cbTok)return;
   cbPing=setInterval(cbTick,15000);
   if(!ridOn)Android.startRid();
-  setCbUi(true);cbRender();
+  setCbUi(true);cbRender();say('Scan started. Listening, checking aircraft and scanning for drone signals.');
 }
 function cbStop(){
   cbTok++;cbOn=false;
@@ -968,7 +994,7 @@ function cbStop(){
   cbMicStop();cbOvDone();
   if(ridOn){ridUserStop=true;Android.stopRid()}
   setCbUi(false);
-  $('#cbOut').textContent='Scan stopped.';
+  $('#cbOut').textContent='Scan stopped.';say('Scan stopped.');
 }
 $('#cbGo').onclick=()=>cbOn?cbStop():cbStart();
 
@@ -989,7 +1015,7 @@ function prefSet(k,val){
 
 // ---- Radar: ADS-B contacts and the direction the phone points ----
 let rdAc=[],rdT=0,rdUp=true,rdSel=null,rdSelName='',rdHits=[];
-const SOUND_C=343;   // m/s, also used by the recording matcher
+let SOUND_C=343;   // m/s, set from the air temperature when weather is known; also used by the recording matcher
 const ADSB_LAG=1;
 const MAX_AGE=45;    // seconds: older reports are not extrapolated further (aircraft turn)
 let rdFix=null;      // last location fix reported by the phone    // seconds: allowance for the ADS-B data service itself
@@ -1151,6 +1177,8 @@ function rdDraw(){
     cap.push('tap an aircraft for details');
   }
   $('#rdCap').textContent=cap.join('; ')+'.';
+  {const near=all.slice(0,5).map(o=>name(o)+', '+fmtD(o.s.dist)+' '+cmp(o.s.nowBr)).join('; ');
+   cv.setAttribute('aria-label','Radar, range '+$('#oRad').value+' nautical miles. '+(rdT?(all.length?all.length+(all.length===1?' aircraft':' aircraft')+' in range. Nearest: '+near+'.':'No aircraft in range.'):'No scan yet.')+' '+cap.join('; ')+'. The aircraft list below has the same contacts with details.')}
   $('#rdMode').textContent=up?'Radar: pointing up (tap for north up)':'Radar: north up'+(rdUp&&hd===null?' (no compass yet)':' (tap for pointing up)');
   rdDebug(hd);
   if(rdSel)rdCardUpdate(selO?selO.o:null,hd);
@@ -1181,12 +1209,114 @@ $('#rdr').addEventListener('click',ev=>{
   let best=null,bd=60;rdHits.forEach(h=>{const d=Math.hypot(h.x-x,h.y-y);if(d<bd){bd=d;best=h}});
   rdSelect(best&&best.hex!==rdSel?best.hex:null);
 });
-$('#oOut').addEventListener('click',ev=>{
-  const p=ev.target.closest&&ev.target.closest('p[data-hex]');if(!p)return;
+function ovPick(p){
   rdSelect(p.dataset.hex===rdSel?null:p.dataset.hex);
-  if(rdSel)$('#rdr').scrollIntoView({behavior:'smooth',block:'start'});
+  if(rdSel){
+    let sm='smooth';try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)sm='auto'}catch(e){}
+    $('#rdr').scrollIntoView({behavior:sm,block:'start'});
+    try{$('#rdCard').focus({preventScroll:true})}catch(e){}
+  }
+}
+$('#oOut').addEventListener('click',ev=>{
+  const p=ev.target.closest&&ev.target.closest('p[data-hex]');if(p)ovPick(p);
+});
+$('#oOut').addEventListener('keydown',ev=>{
+  if(ev.key!=='Enter'&&ev.key!==' ')return;
+  const p=ev.target.closest&&ev.target.closest('p[data-hex]');if(!p)return;
+  ev.preventDefault();ovPick(p);
 });
 (()=>{const s=prefGet('rdUp');if(s==='0')rdUp=false;rdDraw();compassWant(true);if(window.Android)setInterval(rdDraw,1000)})();
+
+// ---- Weather (Open-Meteo, fetched by the Android app) ----
+const SOUND_DEFAULT=343;
+// Speed of sound in dry air; humidity changes it by well under 0.5 %, so it is ignored.
+function soundSpeed(tC){return typeof tC==='number'&&tC>-60&&tC<60?331.3*Math.sqrt(1+tC/273.15):SOUND_DEFAULT}
+let wx=null;
+function wxSet(w){
+  wx=w&&typeof w.tempC==='number'?w:null;
+  SOUND_C=soundSpeed(wx&&wx.tempC);
+  wxDraw();rdDraw();
+}
+function wxLine(w){
+  const p=[Math.round(w.tempC)+' °C'];
+  if(typeof w.windMs==='number')p.push('wind '+Math.round(w.windMs)+' m/s'+(typeof w.windDir==='number'?' from '+cmp(w.windDir):''));
+  if(typeof w.cloudPct==='number')p.push('cloud '+Math.round(w.cloudPct)+'%');
+  if(w.precipMm>0)p.push('precipitation '+w.precipMm.toFixed(1)+' mm');
+  return p.join(', ')+'. Speed of sound '+Math.round(soundSpeed(w.tempC))+' m/s.';
+}
+function wxClipHtml(m){return m.wx&&typeof m.wx.tempC==='number'?'<p><b>Weather when recorded</b><br>'+esc(wxLine(m.wx))+'</p>':''}
+// Plain advice about listening conditions. Wind blows from windDir, so a source on that side is upwind of you
+// and its sound is carried toward you.
+function wxHints(w){
+  const h=[],wind=Math.max(w.windMs||0,0),gust=Math.max(w.gustMs||0,0);
+  if(wind>=5||gust>=9)h.push('Wind this strong adds noise to the microphone and can hide drone sounds. Shield the phone or find shelter.');
+  if(wind>=3&&typeof w.windDir==='number')h.push('Sounds from the '+cmp(w.windDir)+' carry farther to you. Sounds from the '+cmp(w.windDir+180)+' are weaker.');
+  if(w.precipMm>0)h.push('Rain adds hiss that masks high tones.');
+  if(typeof w.visM==='number'&&w.visM<3000)h.push('Low visibility: you may hear aircraft you cannot see.');
+  else if(typeof w.cloudPct==='number'&&w.cloudPct>=90)h.push('Overcast: aircraft may be hidden by cloud.');
+  if(!h.length)h.push('Conditions are good for listening.');
+  return h;
+}
+function wxDraw(){
+  const e=$('#wxCard');if(!e)return;
+  if(!wx){e.hidden=true;e.innerHTML='';return}
+  const w=wx,n=(v,f)=>typeof v==='number'?f(v):'—',ms=v=>Math.round(v);
+  const t=(l,v,sm)=>'<div><small>'+esc(l)+'</small><strong>'+esc(v)+'</strong>'+(sm?'<small>'+esc(sm)+'</small>':'')+'</div>';
+  const when=new Date(w.t||Date.now()).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  e.hidden=false;
+  e.innerHTML='<div class="rch"><b>Weather here</b><span>checked '+esc(when)+'</span></div>'+
+   '<div class="rcn">'+
+    t('Temperature',Math.round(w.tempC)+' °C',Math.round(w.tempC*9/5+32)+' °F')+
+    t('Wind',n(w.windMs,v=>Math.round(v*2.237)+' mph'),n(w.windMs,v=>ms(v)+' m/s'+(typeof w.windDir==='number'?' from '+cmp(w.windDir):'')+(w.gustMs>v+1?', gusts '+ms(w.gustMs):'')))+
+    t('Cloud',n(w.cloudPct,v=>Math.round(v)+'%'))+
+    t('Visibility',n(w.visM,v=>v>=10000?'10+ km':(v/1000).toFixed(1)+' km'))+
+    t('Rain',n(w.precipMm,v=>v>0?v.toFixed(1)+' mm':'none'))+
+    t('Pressure',n(w.pressHpa,v=>Math.round(v)+' hPa'))+
+   '</div>'+
+   '<div class="rcr"><div><small>Speed of sound</small><strong>'+Math.round(soundSpeed(w.tempC))+' m/s</strong></div><div class="rr"><small>used for the sound delay</small></div></div>'+
+   wxHints(w).map(x=>'<p class="mut">'+esc(x)+'</p>').join('');
+}
+
+// ---- First-run guide ----
+const GUIDE=[
+ {t:'Welcome to Sky Ear',b:['Sky Ear helps you learn what drones and aircraft sound like, and match a sound you hear to what is overhead.','It is free and open source. It is experimental: not a drone detector and not a safety system.']},
+ {t:'Permissions',b:['When you first start a scan, Android asks for three things: the microphone (to listen and record), location (to find aircraft near you) and nearby devices (to hear drones that broadcast Remote ID).','Audio is analyzed on your phone. If you decline one, only the feature that needs it stops working.']},
+ {t:'Start a scan',b:['On the Field tab, tap Start scan. It listens through the microphone, checks aircraft data every 15 seconds and scans for Remote ID signals.','Go outside and wait a moment for GPS. Aircraft and weather lookups send your approximate location to api.adsb.lol and open-meteo.com.']},
+ {t:'Read the radar',b:['The radar shows aircraft around you. Hold the back of the phone toward the sky: the shaded wedge is where you are pointing.','Open an aircraft from the list to see where it is now and where its sound is coming from. Sound arrives seconds late, so the two differ. With a screen reader, use the aircraft list under the radar; the radar itself is read as a summary.']},
+ {t:'Record and learn',b:['Record a clip to tag it with nearby aircraft and the weather, then find it in the Library.','Synth and Quiz teach drone sounds, and Listen measures a sound. Tap Help at the top any time to see this guide again.']}
+];
+let gi=0,gPrev=null;
+function gdShow(){
+  const g=GUIDE[gi],last=gi===GUIDE.length-1;
+  $('#gdS').textContent='Step '+(gi+1)+' of '+GUIDE.length;
+  $('#gdT').textContent=g.t;
+  $('#gdB').innerHTML=g.b.map(x=>'<p>'+esc(x)+'</p>').join('');
+  $('#gdD').innerHTML=GUIDE.map((_,i)=>'<i class="'+(i===gi?'on':'')+'"></i>').join('');
+  $('#gdBk').hidden=gi===0;$('#gdSk').hidden=last;$('#gdNx').textContent=last?'Done':'Next';
+}
+function gdFocus(){setTimeout(()=>{try{$('#gdT').focus()}catch(e){}},0)}
+function guideOpen(){
+  gi=0;try{gPrev=document.activeElement}catch(e){gPrev=null}
+  gdShow();$('#gd').hidden=false;$('main').inert=true;gdFocus();
+}
+function guideClose(){
+  $('#gd').hidden=true;$('main').inert=false;prefSet('guideDone','1');
+  try{if(gPrev&&gPrev.focus)gPrev.focus()}catch(e){}
+}
+$('#gdNx').onclick=()=>{if(gi>=GUIDE.length-1){guideClose();return}gi++;gdShow();gdFocus()};
+$('#gdBk').onclick=()=>{if(gi>0){gi--;gdShow();gdFocus()}};
+$('#gdSk').onclick=guideClose;
+$('#hlp').onclick=guideOpen;
+try{document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!$('#gd').hidden)guideClose()})}catch(e){}
+$('#gd').addEventListener('keydown',ev=>{
+  if(ev.key!=='Tab')return;
+  const f=Array.from($('#gd').querySelectorAll('button')).filter(b=>!b.hidden);
+  if(!f.length)return;
+  const a=f[0],z=f[f.length-1];
+  if(ev.shiftKey&&(document.activeElement===a||document.activeElement===$('#gdT'))){ev.preventDefault();z.focus()}
+  else if(!ev.shiftKey&&document.activeElement===z){ev.preventDefault();a.focus()}
+});
+if(prefGet('guideDone')!=='1')guideOpen();
 </script>
 </body>
 </html>

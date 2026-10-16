@@ -13,7 +13,7 @@ const node = () => ({
   connect() {}, disconnect() {}, start() {}, stop() {}, fillRect() {}, putImageData() {}, drawImage() {},
   createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
   getContext: () => node(), classList: { toggle() {} }, style: {}, dataset: {}, appendChild() {},
-  querySelector: () => node(), addEventListener() {}, width: 320, height: 120, value: '1',
+  querySelector: () => node(), querySelectorAll: () => [], addEventListener() {}, setAttribute() {}, focus() {}, width: 320, height: 120, value: '1',
 });
 const cache = {};
 global.document = { querySelector: s => cache[s] || (cache[s] = node()), createElement: () => node() };
@@ -21,7 +21,7 @@ global.performance = { now: () => 0 };
 global.requestAnimationFrame = () => {};
 global.window = global;
 
-const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, cbSummary, rdSolve, rdPlace, rdDiff, LIB}')();
+const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, cbSummary, rdSolve, rdPlace, rdDiff, soundSpeed, wxHints, wxLine, LIB}')();
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -204,6 +204,32 @@ test('radar: heights are measured from the phone, not from sea level', () => {
 test('radar: angle difference wraps around north', () => {
   assert.strictEqual(api.rdDiff(359, 2), 3);
   assert.strictEqual(api.rdDiff(90, 270), 180);
+});
+
+console.log('Weather');
+test('speed of sound follows air temperature and falls back to 343 m/s without a reading', () => {
+  near(api.soundSpeed(0), 331.3, 0.05, '0 C');
+  near(api.soundSpeed(15), 340.3, 0.1, '15 C');
+  near(api.soundSpeed(20), 343.2, 0.1, '20 C');
+  assert.strictEqual(api.soundSpeed(undefined), 343);
+  assert.strictEqual(api.soundSpeed(200), 343);   // implausible value is ignored
+});
+test('cold air lengthens the sound delay', () => {
+  const a = { distM: 3430, bearing: 0, altFt: 0, gs: 0, track: 0 };
+  const warm = api.rdSolve(a, 0, api.soundSpeed(20)), cold = api.rdSolve(a, 0, api.soundSpeed(-10));
+  assert.ok(cold.tau > warm.tau + 0.2, `cold ${cold.tau} warm ${warm.tau}`);
+});
+test('listening hints: wind noise, direction, rain, visibility, and the all-clear', () => {
+  assert.ok(api.wxHints({ tempC: 15, windMs: 7, windDir: 315 }).join(' ').includes('Wind this strong'));
+  assert.ok(api.wxHints({ tempC: 15, windMs: 4, windDir: 315 }).join(' ').includes('from the NW carry farther'));
+  assert.ok(api.wxHints({ tempC: 15, windMs: 4, windDir: 315 }).join(' ').includes('from the SE are weaker'));
+  assert.ok(api.wxHints({ tempC: 15, precipMm: 0.4 }).join(' ').includes('Rain'));
+  assert.ok(api.wxHints({ tempC: 15, visM: 1500 }).join(' ').includes('Low visibility'));
+  assert.deepStrictEqual(api.wxHints({ tempC: 15, windMs: 1, cloudPct: 20 }), ['Conditions are good for listening.']);
+});
+test('clip weather line', () => {
+  const l = api.wxLine({ tempC: 15.2, windMs: 5.4, windDir: 90, cloudPct: 40, precipMm: 0 });
+  assert.strictEqual(l, '15 \u00b0C, wind 5 m/s from E, cloud 40%. Speed of sound 340 m/s.');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

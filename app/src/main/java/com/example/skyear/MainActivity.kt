@@ -69,8 +69,12 @@ class MainActivity : ComponentActivity() {
         @Volatile var lat: Double? = null
         @Volatile var lon: Double? = null
         @Volatile var acc: Float? = null
+        @Volatile var wx: JSONObject? = null
         val snaps = JSONArray()
     }
+
+    private class WxCache(val key: String, val at: Long, val data: JSONObject)
+    @Volatile private var wxCache: WxCache? = null
 
     private lateinit var web: WebView
     private var pendingMic: PermissionRequest? = null
@@ -439,6 +443,53 @@ class MainActivity : ComponentActivity() {
         return out
     }
 
+    // Current weather from Open-Meteo (free, no key). Location is rounded to about 1 km before it is sent.
+    // Returns null when the service cannot be reached, so callers treat weather as optional.
+    private fun queryWeather(lat: Double, lon: Double): JSONObject? {
+        val la = Math.round(lat * 100.0) / 100.0
+        val lo = Math.round(lon * 100.0) / 100.0
+        // Weather changes slowly, so reuse a recent answer for the same ~1 km cell instead of asking every scan.
+        wxCache?.let {
+            if (it.key == "$la,$lo" && System.currentTimeMillis() - it.at < 10 * 60 * 1000L) return it.data
+        }
+        return try {
+            val cur = "temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m," +
+                "wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation,visibility,weather_code"
+            val conn = URL("https://api.open-meteo.com/v1/forecast?latitude=$la&longitude=$lo&current=$cur&wind_speed_unit=ms")
+                .openConnection() as HttpURLConnection
+            conn.connectTimeout = 6000
+            conn.readTimeout = 6000
+            conn.setRequestProperty("User-Agent", "SkyEar/0.2")
+            val body = try {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } finally {
+                conn.disconnect()
+            }
+            val c = JSONObject(body).optJSONObject("current") ?: return null
+            val o = JSONObject().put("t", System.currentTimeMillis())
+            fun put(key: String, src: String) {
+                val v = c.optDouble(src, Double.NaN)
+                if (!v.isNaN()) o.put(key, v)
+            }
+            put("tempC", "temperature_2m")
+            put("rh", "relative_humidity_2m")
+            put("pressHpa", "surface_pressure")
+            put("windMs", "wind_speed_10m")
+            put("windDir", "wind_direction_10m")
+            put("gustMs", "wind_gusts_10m")
+            put("cloudPct", "cloud_cover")
+            put("precipMm", "precipitation")
+            put("visM", "visibility")
+            put("code", "weather_code")
+            if (o.has("tempC")) {
+                wxCache = WxCache("$la,$lo", System.currentTimeMillis(), o)
+                o
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun fetchOverhead(radiusNm: Int) {
         Thread {
             try {
@@ -451,7 +502,10 @@ class MainActivity : ComponentActivity() {
                     .put("ageS", (System.currentTimeMillis() - loc.time) / 1000.0)
                     .put("provider", loc.provider ?: "")
                 if (loc.hasAltitude()) fix.put("alt", loc.altitude)
-                sendToPage("onOverhead", JSONObject().put("ac", out).put("fix", fix).toString())
+                val msg = JSONObject().put("ac", out).put("fix", fix)
+                val wx = queryWeather(loc.latitude, loc.longitude)
+                if (wx != null) msg.put("wx", wx)
+                sendToPage("onOverhead", msg.toString())
             } catch (e: Exception) {
                 sendToPage("onOverheadError", "Could not get aircraft: ${e.message}")
             }
@@ -668,6 +722,7 @@ class MainActivity : ComponentActivity() {
         st.lat = loc.latitude
         st.lon = loc.longitude
         st.acc = loc.accuracy
+        st.wx = queryWeather(loc.latitude, loc.longitude)
         try {
             declination = GeomagneticField(
                 loc.latitude.toFloat(), loc.longitude.toFloat(), loc.altitude.toFloat(), System.currentTimeMillis()
@@ -726,6 +781,7 @@ class MainActivity : ComponentActivity() {
                 val acc = st.acc
                 if (acc != null) m.put("accM", acc.toDouble())
             }
+            st.wx?.let { m.put("wx", it) }
             synchronized(st.snaps) { m.put("snaps", st.snaps) }
             File(clipsDir(), "${st.id}.json").writeText(m.toString())
             sendToPage("onClipSaved", st.id)

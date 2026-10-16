@@ -120,3 +120,18 @@ Tap an aircraft on the radar (or a row in the list) to open a detail card. Two d
 - **Sound delay.** The sound you hear now left the aircraft `tau` seconds ago, where `tau` = straight-line distance (ground distance and height) divided by the speed of sound. That distance depends on where the aircraft was, so the app solves it by iteration. The card shows *Look at* (where the aircraft is now) and *Sound from* (where it was `tau` seconds ago), each with how far to turn and tilt the phone. The beam highlight on the radar uses the sound position, because that is where you are listening toward.
 
 The speed of sound is fixed at 343 m/s (about 20 C) and shared with the recording matcher. Flight is assumed straight and steady, so a turning aircraft will drift from the estimate, and a 1 to 2 s timing error is roughly 50 to 100 m for a slow plane. The maths is in `rdSolve` and is covered by tests.
+
+## Weather (Field tab)
+
+The Android app asks Open-Meteo for current conditions at your location (rounded to about 1 km, cached for 10 minutes) whenever a scan or recording needs it. The reply is optional: if it fails, everything else works.
+
+- **Speed of sound.** Air temperature sets it: `c = 331.3 * sqrt(1 + T/273.15)` m/s, so 15 C gives 340 m/s and -10 C gives 325 m/s. The radar's sound delay and the recording matcher use this value instead of a fixed 343 m/s. Humidity changes it by well under 0.5 percent and is ignored. Wind is not added to the path.
+- **Weather card.** Temperature, wind (with gusts and the direction it blows from), cloud, visibility, rain and pressure, with short listening advice: wind of about 5 m/s or more adds microphone noise; sounds from the side the wind blows from carry farther to you.
+- **Clips.** The weather at the start of a recording is saved in the clip's details and shown in the Library. Matching a saved clip uses that clip's own temperature.
+
+## Accessibility
+
+- Tabs, panels, sliders and the aircraft list use standard roles and labels. Aircraft rows are focusable buttons that open the details card and move focus to it.
+- The radar and spectrograms are pictures, so each has a text description. The radar's description lists the nearest aircraft with distance and direction and is updated about once a second.
+- A polite live region announces scan start and stop, the nearest aircraft when it changes, drone signals when the count changes, and recording events. Repeats of the same message are suppressed so a 15-second scan does not read the same sentence again.
+- The first-run guide is a modal dialog: focus moves into it, Tab stays inside, Escape closes it, and focus returns to where it was. The page behind it is inert while it is open. The Help button reopens it.

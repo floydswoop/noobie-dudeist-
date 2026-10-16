@@ -34,12 +34,12 @@ The whole interface is one file, [`app/src/main/assets/index.html`](app/src/main
 
 - [Full project README](docs/PROJECT.md): permissions, tests, known limitations, credits
 - [How it works](docs/HOW_IT_WORKS.md): sound analysis, ADS-B matching, Remote ID, phone pointing
-- [Privacy](docs/PRIVACY.md): what stays on the phone and what is sent out (your approximate location goes to the ADS-B service, api.adsb.lol)
+- [Privacy](docs/PRIVACY.md): what stays on the phone and what is sent out (your approximate location goes to the ADS-B service, api.adsb.lol, and, rounded to about 1 km, to the weather service, open-meteo.com)
 - [Contributing](CONTRIBUTING.md): how to help and run the tests (`node tests/run-tests.js`)
 
 ## Notices
 
-Aircraft data comes from the community [adsb.lol](https://adsb.lol) API, and its terms may change. Drone brand names are trademarks of their owners, used only to describe approximate sound, with no affiliation or endorsement. Recording sound can capture people's voices, so follow the recording laws where you are.
+Aircraft data comes from the community [adsb.lol](https://adsb.lol) API and weather from [Open-Meteo](https://open-meteo.com) (free for non-commercial use), and their terms may change. Drone brand names are trademarks of their owners, used only to describe approximate sound, with no affiliation or endorsement. Recording sound can capture people's voices, so follow the recording laws where you are.
 
 ## License
 
