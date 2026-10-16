@@ -18,7 +18,7 @@ Sky Ear started as a drone-safety idea: help people recognize the sound of diffe
 
 ## Try it
 
-1. On your Android phone, download **[SkyEar.apk](https://github.com/floydswoop/noobie-dudeist-/raw/main/sky-ear/SkyEar.apk)**.
+1. On your Android phone, download **[SkyEar.apk](https://github.com/floydswoop/sky-ear/raw/main/sky-ear/SkyEar.apk)**.
 2. Open it and allow installs from this source when Android asks. (It is an unsigned debug build for testing.)
 3. Allow microphone, location and nearby devices on first use. Headphones help, since phone speakers cannot reproduce low tones.
 
