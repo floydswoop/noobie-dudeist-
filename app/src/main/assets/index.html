@@ -29,6 +29,17 @@ button:disabled{opacity:.45}
 select{font:inherit;font-weight:600;width:100%;min-height:44px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 10px;margin-bottom:4px}
 button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
 canvas{width:100%;height:120px;display:block;background:#000;border-radius:8px}
+#ovh .rc{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin:0 0 14px}
+.rc .rch{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.rc .rch b{font-size:22px}.rc .rch span{color:var(--mut);text-align:right}
+.rc p.mut{margin:2px 0 0;min-height:0}.rc p.mut:empty{display:none}
+.rc .rcn{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.rc .rcn div{background:var(--bg);border-radius:8px;padding:6px 10px}
+.rc small{display:block;color:var(--mut);font-size:12px;font-weight:400}.rc strong{font-size:18px}
+.rc .rcn strong{font-size:19px}
+.rc .rcr{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--bd)}
+.rc .rr{text-align:right}.rc .ok{color:var(--ac)}
+.rc .rcf{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--bd);padding-top:8px;color:var(--mut);font-size:13px}
+#oOut p[data-hex]{cursor:pointer}
 canvas#rdr{height:auto;aspect-ratio:1;max-width:440px;margin:8px auto 4px;background:var(--card);border:1px solid var(--bd)}
 .cap{color:var(--mut);font-size:13px;margin:4px 0 12px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
@@ -73,6 +84,7 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <canvas id="rdr" width="640" height="640" role="img" aria-label="Radar of nearby aircraft and the direction the phone points"></canvas>
 <div class="row"><button id="rdMode">Radar: pointing up</button></div>
 <p class="cap" id="rdCap"></p>
+<div class="rc" id="rdCard" hidden></div>
 <h2 style="font-size:20px;margin:20px 0 6px">Aircraft overhead</h2>
 <div class="row"><button id="oGo" class="main">What's overhead</button></div>
 <div id="oOut" class="res"></div>
@@ -553,7 +565,7 @@ function onOverhead(js){
     if(alt!==null)parts.push(alt.toLocaleString()+' ft');else if(a.altFt==='ground')parts.push('on ground');
     if(a.gs>0)parts.push(Math.round(a.gs)+' kt');
     if(el!==null)parts.push(el+'° above horizon');
-    return '<p><b>'+esc(a.flight||a.hex)+'</b> '+esc(a.type||'?')+(a.reg?' '+esc(a.reg):'')+'<br>'+esc(parts.join(', '))+'</p>';
+    return '<p data-hex="'+esc(a.hex)+'"><b>'+esc(a.flight||a.hex)+'</b> '+esc(a.type||'?')+(a.reg?' '+esc(a.reg):'')+'<br>'+esc(parts.join(', '))+'</p>';
   }).join('')+'<p class="mut">'+r.ac.length+' aircraft reported. Positions are a few seconds old.</p>';
 }
 
@@ -587,10 +599,10 @@ function aimOf(pt,q){const m2=pt.mode===2;return{az:((m2?q.azm2:q.azm)+(pt.decl|
 function angSep(a1,e1,a2,e2){const p=Math.PI/180,c=Math.sin(e1*p)*Math.sin(e2*p)+Math.cos(e1*p)*Math.cos(e2*p)*Math.cos((a1-a2)*p);return Math.acos(Math.max(-1,Math.min(1,c)))/p}
 function sources(m){
   if(m.lat==null||!m.snaps)return [];
-  const c=343,kx=111320*Math.cos(m.lat*Math.PI/180),ky=110540,by={};
+  const c=SOUND_C,kx=111320*Math.cos(m.lat*Math.PI/180),ky=110540,by={};
   m.snaps.forEach(s=>(s.ac||[]).forEach(a=>{
     if(a.lat==null||a.lon==null||!a.hex)return;
-    (by[a.hex]=by[a.hex]||[]).push({t:s.t,x:(a.lon-m.lon)*kx,y:(a.lat-m.lat)*ky,
+    (by[a.hex]=by[a.hex]||[]).push({t:s.t-(a.seenPos||0)*1000,x:(a.lon-m.lon)*kx,y:(a.lat-m.lat)*ky,
       z:typeof a.altFt==='number'?a.altFt*.3048:0,v:a.gs>0?a.gs*.51444:0,tr:(a.track||0)*Math.PI/180,a});
   }));
   const pos=(e,T)=>{const dt=(T-e.t)/1000;return{x:e.x+e.v*dt*Math.sin(e.tr),y:e.y+e.v*dt*Math.cos(e.tr),z:e.z}};
@@ -976,12 +988,26 @@ function prefSet(k,val){
 })();
 
 // ---- Radar: ADS-B contacts and the direction the phone points ----
-let rdAc=[],rdT=0,rdUp=true;
-// East/north metres of an aircraft now: its reported position, moved along its track for the time since the report.
-function rdGeom(a,ageS){
-  const b=a.bearing*Math.PI/180;let e=a.distM*Math.sin(b),n=a.distM*Math.cos(b);
-  if(a.gs>0&&typeof a.track==='number'&&ageS>0&&ageS<120){const d=a.gs*.5144*ageS,t=a.track*Math.PI/180;e+=d*Math.sin(t);n+=d*Math.cos(t)}
-  return{e,n};
+let rdAc=[],rdT=0,rdUp=true,rdSel=null,rdSelName='',rdHits=[];
+const SOUND_C=343;   // m/s, also used by the recording matcher
+const ADSB_LAG=1;    // seconds: allowance for the ADS-B data service itself
+const BEAM=15;
+const TYPE_NAMES={C152:'Cessna 152',C172:'Cessna 172 Skyhawk',C182:'Cessna 182',C206:'Cessna 206',C208:'Cessna Caravan',C210:'Cessna 210',C25A:'Cessna CitationJet',C510:'Cessna Citation Mustang',C525:'Cessna CitationJet',C560:'Cessna Citation V',C680:'Cessna Citation Sovereign',PA28:'Piper Cherokee/Warrior',PA32:'Piper Cherokee Six',PA34:'Piper Seneca',PA44:'Piper Seminole',PA46:'Piper Malibu',SR20:'Cirrus SR20',SR22:'Cirrus SR22',BE35:'Beech Bonanza',BE36:'Beech Bonanza A36',BE58:'Beech Baron',BE20:'Beech King Air 200',BE9L:'Beech King Air 90',DA40:'Diamond DA40',DA42:'Diamond DA42',M20P:'Mooney M20',R22:'Robinson R22',R44:'Robinson R44',R66:'Robinson R66',B06:'Bell 206',B407:'Bell 407',EC35:'Airbus EC135',H60:'Black Hawk',S76:'Sikorsky S-76',PC12:'Pilatus PC-12',TBM9:'Daher TBM 900',B737:'Boeing 737',B738:'Boeing 737-800',B739:'Boeing 737-900',B38M:'Boeing 737 MAX 8',B752:'Boeing 757-200',B763:'Boeing 767-300',B772:'Boeing 777-200',B77W:'Boeing 777-300ER',B788:'Boeing 787-8',B789:'Boeing 787-9',A319:'Airbus A319',A320:'Airbus A320',A321:'Airbus A321',A20N:'Airbus A320neo',A21N:'Airbus A321neo',A332:'Airbus A330-200',A333:'Airbus A330-300',A359:'Airbus A350-900',E170:'Embraer 170',E75L:'Embraer 175',E75S:'Embraer 175',CRJ2:'Bombardier CRJ-200',CRJ7:'Bombardier CRJ-700',CRJ9:'Bombardier CRJ-900',DH8D:'Dash 8 Q400',AT76:'ATR 72'};
+const typeName=c=>TYPE_NAMES[c]||c||'Unknown type';
+// Where an aircraft is now, and where the sound you hear now came from.
+// a: {distM, bearing, altFt, gs, track} as reported; ageS: how old that report is; c: speed of sound (m/s).
+// The sound left the aircraft tau seconds ago, and tau depends on how far away it was then, so iterate.
+function rdSolve(a,ageS,c){
+  c=c||SOUND_C;
+  const b=a.bearing*Math.PI/180,v=a.gs>0?a.gs*.51444:0,t=(a.track||0)*Math.PI/180;
+  const alt=typeof a.altFt==='number'?a.altFt*.3048:0;
+  const age=Math.min(Math.max(ageS||0,0),120);
+  const e=a.distM*Math.sin(b)+v*age*Math.sin(t),n=a.distM*Math.cos(b)+v*age*Math.cos(t);
+  let tau=0,he=e,hn=n;
+  for(let i=0;i<60;i++){he=e-v*tau*Math.sin(t);hn=n-v*tau*Math.cos(t);tau=Math.min(120,Math.hypot(he,hn,alt)/c)}
+  const el=(x,y)=>Math.atan2(alt,Math.hypot(x,y))*180/Math.PI,br=(x,y)=>(Math.atan2(x,y)*180/Math.PI+360)%360;
+  return{e,n,he,hn,alt,tau,age,v,lagM:v*tau,dist:Math.hypot(e,n),slant:Math.hypot(e,n,alt),
+    nowBr:br(e,n),nowEl:el(e,n),hBr:br(he,hn),hEl:el(he,hn)};
 }
 // Screen position (unit radius 1 = edge of radar, x right, y up). rot = compass bearing that points up.
 function rdPlace(e,n,rangeM,rot){
@@ -994,17 +1020,56 @@ function rdHeading(){
   const mode=+$('#ptMode').value;
   return((mode===2?ptNow.az2:ptNow.az)+(ptDecl||0)+360)%360;
 }
-const BEAM=15;
+function rdPhoneEl(){return ptNow?(+$('#ptMode').value===2?ptNow.el2:ptNow.el):null}
+function rdTurn(az,el,hd){
+  if(hd===null)return '—';
+  const da=((az-hd+540)%360)-180,pe=rdPhoneEl(),de=pe===null?0:el-pe;
+  if(Math.abs(da)<1&&Math.abs(de)<1)return 'on target';
+  let t=Math.abs(Math.round(da))+'° '+(da>=0?'right':'left');
+  if(pe!==null)t+=', '+Math.abs(Math.round(de))+'° '+(de>=0?'up':'down');
+  return t;
+}
+function rdAgeOf(a){return(Date.now()-rdT)/1000+(a.seenPos||0)+ADSB_LAG}
+function rdSelect(hex){
+  rdSel=hex||null;
+  const box=$('#rdCard');
+  if(!rdSel){box.hidden=true;box.innerHTML='';rdDraw();return}
+  const a=rdAc.find(x=>x.hex===rdSel);rdSelName=a?(a.flight||a.reg||a.hex):rdSel;
+  box.hidden=false;
+  box.innerHTML='<div class="rch"><b id="rcN"></b><span id="rcT"></span></div><p class="mut" id="rcV"></p>'+
+   '<div class="rcn"><div><small>Distance</small><strong id="rcD"></strong></div><div><small>Altitude</small><strong id="rcA"></strong></div><div><small>Speed</small><strong id="rcG"></strong></div></div>'+
+   '<div class="rcr"><div><small>LOOK AT (where it is now)</small><strong id="rcL"></strong></div><div class="rr"><small>turn</small><strong id="rcLt"></strong></div></div>'+
+   '<div class="rcr"><div><small id="rcSl"></small><strong class="ok" id="rcS"></strong></div><div class="rr"><small>turn</small><strong class="ok" id="rcSt"></strong></div></div>'+
+   '<div class="rcr"><div><small>Sound delay</small><strong id="rcTau"></strong></div><div class="rr"><small>Plane moved</small><strong id="rcM"></strong></div><div class="rr"><small>Position age</small><strong id="rcP"></strong></div></div>'+
+   '<div class="rcf"><span>Refreshes with each scan</span><button id="rcX" type="button">Close</button></div>';
+  $('#rcX').onclick=()=>rdSelect(null);
+  rdDraw();
+}
+function rdCardUpdate(o,hd){
+  const t=(id,v)=>{const e=$('#'+id);if(e)e.textContent=v};
+  if(!o){t('rcN',rdSelName);t('rcT','no longer reported');['rcD','rcA','rcG','rcL','rcLt','rcS','rcSt','rcTau','rcM','rcP'].forEach(i=>t(i,'—'));t('rcSl','SOUND FROM');t('rcV','');return}
+  const a=o.a,s=o.s;
+  t('rcN',a.flight||a.reg||a.hex);t('rcT',typeName(a.type)+(a.reg&&a.flight&&a.reg!==a.flight?' · '+a.reg:''));
+  const vs=a.vsFpm;t('rcV',typeof vs==='number'&&Math.abs(vs)>=100?(vs>0?'Climbing ':'Descending ')+Math.abs(Math.round(vs/50)*50).toLocaleString()+' ft/min':'');
+  t('rcD',fmtD(s.dist));
+  t('rcA',typeof a.altFt==='number'?a.altFt.toLocaleString()+' ft':a.altFt==='ground'?'on ground':'—');
+  t('rcG',a.gs>0?Math.round(a.gs)+' kt':'—');
+  t('rcL',Math.round(s.nowBr)+'° '+cmp(s.nowBr)+', '+Math.round(s.nowEl)+'° up');
+  t('rcLt',rdTurn(s.nowBr,s.nowEl,hd));
+  t('rcSl','SOUND FROM (where it was '+Math.round(s.tau)+' s ago)');
+  t('rcS',Math.round(s.hBr)+'° '+cmp(s.hBr)+', '+Math.round(s.hEl)+'° up');
+  const inb=hd!==null&&rdDiff(s.hBr,hd)<=BEAM;
+  t('rcSt',rdTurn(s.hBr,s.hEl,hd)+(inb?' · in beam':''));
+  t('rcTau',s.tau.toFixed(1)+' s');t('rcM',s.v>0?Math.round(s.lagM)+' m':'—');t('rcP',Math.round(s.age)+' s');
+}
 function rdDraw(){
   const cv=$('#rdr');
   if(!cv||!window.getComputedStyle||$('#ovh').hidden)return;
   const g=cv.getContext('2d'),W=cv.width,C=W/2,R=W/2-46,cs=getComputedStyle(document.documentElement);
   const col=(n,d)=>cs.getPropertyValue(n).trim()||d,fg=col('--fg','#16201c'),mut=col('--mut','#5b6862'),ac=col('--ac','#0b6e5a'),bd=col('--bd','#c9d0cc'),card=col('--card','#fff');
   const rangeM=+$('#oRad').value*1852,hd=rdHeading(),up=rdUp&&hd!==null,rot=up?hd:0;
-  const pt=(x,y)=>[C+x*R,C-y*R];
   g.fillStyle=card;g.fillRect(0,0,W,W);
   g.font='600 24px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
-  // beam
   if(hd!==null){
     const a0=(hd-rot-BEAM-90)*Math.PI/180,a1=(hd-rot+BEAM-90)*Math.PI/180;
     g.beginPath();g.moveTo(C,C);g.arc(C,C,R,a0,a1);g.closePath();
@@ -1012,7 +1077,6 @@ function rdDraw(){
     const am=(hd-rot-90)*Math.PI/180;
     g.strokeStyle=ac;g.lineWidth=3;g.beginPath();g.moveTo(C,C);g.lineTo(C+Math.cos(am)*R,C+Math.sin(am)*R);g.stroke();
   }
-  // rings
   g.strokeStyle=bd;g.lineWidth=2;g.fillStyle=mut;
   for(let k=1;k<=3;k++){
     g.beginPath();g.arc(C,C,R*k/3,0,Math.PI*2);g.stroke();
@@ -1020,61 +1084,87 @@ function rdDraw(){
     g.textAlign='left';g.font='600 20px system-ui,sans-serif';g.fillText(lab,C+6,C-R*k/3+14);
   }
   g.beginPath();g.moveTo(C-R,C);g.lineTo(C+R,C);g.moveTo(C,C-R);g.lineTo(C,C+R);g.stroke();
-  // compass letters
   g.font='700 26px system-ui,sans-serif';g.textAlign='center';
   [['N',0],['E',90],['S',180],['W',270]].forEach(([l,b])=>{
     const t=(b-rot)*Math.PI/180,x=C+Math.sin(t)*(R+26),y=C-Math.cos(t)*(R+26);
     g.fillStyle=l==='N'?fg:mut;g.fillText(l,x,y);
   });
-  // aircraft
-  const age=(Date.now()-rdT)/1000,list=rdAc.map(a=>{const q=rdGeom(a,age);return{a,p:rdPlace(q.e,q.n,rangeM,rot)}})
-    .filter(o=>o.p.r<=rangeM*1.02).sort((x,y)=>x.p.r-y.p.r).slice(0,14);
-  let inBeam=[];
-  list.forEach((o,i)=>{
-    const [x,y]=pt(o.p.x,o.p.y),hit=hd!==null&&rdDiff(o.p.bearing,hd)<=BEAM;
-    if(hit)inBeam.push(o.a);
-    const tr=typeof o.a.track==='number'?(o.a.track-rot)*Math.PI/180:null;
-    g.fillStyle=hit?ac:fg;g.strokeStyle=card;g.lineWidth=2;
+  const pt=(p)=>[C+p.x*R,C-p.y*R];
+  const all=rdAc.map(a=>{const s=rdSolve(a,rdAgeOf(a));return{a,s,p:rdPlace(s.e,s.n,rangeM,rot)}})
+    .filter(o=>o.p.r<=rangeM*1.02).sort((x,y)=>x.p.r-y.p.r);
+  const list=all.slice(0,14);
+  if(rdSel&&!list.some(o=>o.a.hex===rdSel)){const f=all.find(o=>o.a.hex===rdSel);if(f)list.push(f)}
+  const name=o=>(o.a.flight||o.a.reg||o.a.type||o.a.hex||'?').trim();
+  const arrow=(x,y,tr,k)=>{
     g.beginPath();
-    if(tr===null){g.arc(x,y,9,0,Math.PI*2)}
-    else{
-      const f=(d,s)=>[x+Math.sin(tr+d)*s,y-Math.cos(tr+d)*s];
-      const p1=f(0,16),p2=f(2.5,11),p3=f(Math.PI,5),p4=f(-2.5,11);
-      g.moveTo(...p1);g.lineTo(...p2);g.lineTo(...p3);g.lineTo(...p4);g.closePath();
-    }
+    if(tr===null){g.arc(x,y,9*k,0,Math.PI*2)}
+    else{const f=(d,m)=>[x+Math.sin(tr+d)*m,y-Math.cos(tr+d)*m];
+      g.moveTo(...f(0,16*k));g.lineTo(...f(2.5,11*k));g.lineTo(...f(Math.PI,5*k));g.lineTo(...f(-2.5,11*k));g.closePath()}
     g.fill();g.stroke();
+  };
+  const inBeam=[];rdHits=[];let selO=null;
+  list.forEach((o,i)=>{
+    const [x,y]=pt(o.p),hit=hd!==null&&rdDiff(o.s.hBr,hd)<=BEAM;
+    if(hit)inBeam.push(o.a);
+    rdHits.push({hex:o.a.hex,x,y});
+    if(o.a.hex===rdSel){selO={o,x,y};return}
+    const tr=typeof o.a.track==='number'?(o.a.track-rot)*Math.PI/180:null;
+    g.fillStyle=hit?ac:fg;g.strokeStyle=card;g.lineWidth=2;arrow(x,y,tr,1);
     if(i<8||hit){
       const alt=typeof o.a.altFt==='number'?' '+(o.a.altFt>=1000?(o.a.altFt/1000).toFixed(1)+'k':o.a.altFt):'';
       g.font=(hit?'700 ':'600 ')+'22px system-ui,sans-serif';g.fillStyle=hit?ac:fg;
-      g.textAlign=x>C?'left':'right';g.strokeStyle=card;g.lineWidth=4;
-      const t=((o.a.flight||o.a.reg||o.a.type||o.a.hex||'?').trim()+alt),tx=x+(x>C?14:-14);
+      const t=name(o)+alt;let left=x>C;const tw=g.measureText(t).width;
+      if(left&&x+14+tw>W-4)left=false;else if(!left&&x-14-tw<4)left=true;   // keep labels inside the radar
+      g.textAlign=left?'left':'right';g.strokeStyle=card;g.lineWidth=4;
+      const tx=x+(left?14:-14);
       g.strokeText(t,tx,y-16);g.fillText(t,tx,y-16);
     }
   });
-  // you
+  if(selO){
+    const{o,x,y}=selO,[hx,hy]=pt(rdPlace(o.s.he,o.s.hn,rangeM,rot));
+    const tr=typeof o.a.track==='number'?(o.a.track-rot)*Math.PI/180:null;
+    if(o.s.v>0){
+      g.setLineDash([6,6]);g.strokeStyle=ac;g.lineWidth=3;g.beginPath();g.moveTo(hx,hy);g.lineTo(x,y);g.stroke();g.setLineDash([]);
+      g.beginPath();g.arc(hx,hy,8,0,Math.PI*2);g.fillStyle=card;g.fill();g.lineWidth=3;g.strokeStyle=ac;g.stroke();
+    }
+    g.beginPath();g.arc(x,y,20,0,Math.PI*2);g.lineWidth=3;g.strokeStyle=ac;g.stroke();
+    g.fillStyle=ac;g.strokeStyle=card;g.lineWidth=2;arrow(x,y,tr,1.25);
+    g.font='700 24px system-ui,sans-serif';g.fillStyle=ac;g.textAlign=x>C?'left':'right';
+    g.fillText(name(o),x+(x>C?30:-30),y+4);
+    if(o.s.v>0){g.font='600 20px system-ui,sans-serif';g.textAlign='center';g.fillText('sound from here',hx,hy+(hy<y?-22:34))}
+  }
   g.fillStyle=fg;g.beginPath();g.arc(C,C,7,0,Math.PI*2);g.fill();
-  // message when empty
   g.textAlign='center';g.fillStyle=mut;g.font='600 24px system-ui,sans-serif';
   if(!rdT)g.fillText('Tap Start scan to plot aircraft',C,C+R*.5);
   else if(!list.length)g.fillText('No aircraft in range',C,C+R*.5);
-  // caption
   let cap=[];
   if(hd!==null){
-    const el=ptNow?(+$('#ptMode').value===2?ptNow.el2:ptNow.el):0;
+    const el=rdPhoneEl();
     cap.push('Pointing '+Math.round(hd)+'° '+cmp(hd)+', '+Math.round(Math.abs(el))+'° '+(el>=0?'above':'below')+' the horizon');
     if(ptDecl===null)cap.push('magnetic north until your location is known');
   }else cap.push(window.Android?'Waiting for the compass':'Compass works in the Android app only');
   if(rdT){
-    if(hd!==null)cap.push(inBeam.length?'in the beam: '+inBeam.slice(0,3).map(a=>(a.flight||a.reg||a.hex||'?').trim()).join(', '):'nothing in the beam');
-    cap.push('aircraft positions '+Math.round(age)+' s old, moved along their tracks');
+    if(hd!==null)cap.push(inBeam.length?'sound is coming from the beam: '+inBeam.slice(0,3).map(a=>(a.flight||a.reg||a.hex||'?').trim()).join(', '):'nothing in the beam');
+    cap.push('tap an aircraft for details');
   }
   $('#rdCap').textContent=cap.join('; ')+'.';
   $('#rdMode').textContent=up?'Radar: pointing up (tap for north up)':'Radar: north up'+(rdUp&&hd===null?' (no compass yet)':' (tap for pointing up)');
+  if(rdSel)rdCardUpdate(selO?selO.o:null,hd);
 }
 function rdSet(ac){rdAc=ac;rdT=Date.now();rdDraw()}
 function compassWant(on){try{if(window.Android&&Android.startCompass){on?Android.startCompass():Android.stopCompass()}}catch(e){}}
 $('#rdMode').onclick=()=>{rdUp=!rdUp;prefSet('rdUp',rdUp?'1':'0');rdDraw()};
 $('#oRad').addEventListener('input',rdDraw);
+$('#rdr').addEventListener('click',ev=>{
+  const cv=$('#rdr'),r=cv.getBoundingClientRect(),k=cv.width/r.width,x=(ev.clientX-r.left)*k,y=(ev.clientY-r.top)*k;
+  let best=null,bd=60;rdHits.forEach(h=>{const d=Math.hypot(h.x-x,h.y-y);if(d<bd){bd=d;best=h}});
+  rdSelect(best&&best.hex!==rdSel?best.hex:null);
+});
+$('#oOut').addEventListener('click',ev=>{
+  const p=ev.target.closest&&ev.target.closest('p[data-hex]');if(!p)return;
+  rdSelect(p.dataset.hex===rdSel?null:p.dataset.hex);
+  if(rdSel)$('#rdr').scrollIntoView({behavior:'smooth',block:'start'});
+});
 (()=>{const s=prefGet('rdUp');if(s==='0')rdUp=false;rdDraw();compassWant(true);if(window.Android)setInterval(rdDraw,1000)})();
 </script>
 </body>

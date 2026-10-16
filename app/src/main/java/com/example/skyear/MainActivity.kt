@@ -429,6 +429,11 @@ class MainActivity : ComponentActivity() {
                 .put("distM", res[0].toDouble())
                 .put("bearing", ((res[1] + 360f) % 360f).toDouble())
             if (a.has("track")) o.put("track", a.optDouble("track", 0.0))
+            // How old the position already was when the service sent it, and climb/descent rate (ft/min)
+            if (a.has("seen_pos")) o.put("seenPos", a.optDouble("seen_pos", 0.0))
+            val vs = if (a.has("baro_rate")) a.optDouble("baro_rate", Double.NaN)
+                     else a.optDouble("geom_rate", Double.NaN)
+            if (!vs.isNaN()) o.put("vsFpm", vs)
             out.put(o)
         }
         return out

@@ -21,7 +21,7 @@ global.performance = { now: () => 0 };
 global.requestAnimationFrame = () => {};
 global.window = global;
 
-const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, cbSummary, rdGeom, rdPlace, rdDiff, LIB}')();
+const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, cbSummary, rdSolve, rdPlace, rdDiff, LIB}')();
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -168,11 +168,32 @@ test('radar: pointing up rotates the picture so the heading is up', () => {
   const q = api.rdPlace(0, 5000, 10000, 90);   // north plane is to the left when facing east
   assert(q.x < -0.49 && Math.abs(q.y) < 1e-9);
 });
-test('radar: dead reckoning moves a plane along its track', () => {
-  const g = api.rdGeom({ distM: 1000, bearing: 0, gs: 100, track: 90 }, 10);   // 100 kt = 51.4 m/s
-  assert(Math.abs(g.n - 1000) < 1e-6 && Math.abs(g.e - 514.4) < 0.1);
-  const old = api.rdGeom({ distM: 1000, bearing: 0, gs: 100, track: 90 }, 500);   // too old: no extrapolation
-  assert(Math.abs(old.e) < 1e-6);
+test('radar: sound delay for a stationary source is slant range / speed of sound', () => {
+  const r = api.rdSolve({ distM: 4200, bearing: 0, altFt: 2500, gs: 0, track: 0 }, 10, 343);
+  assert(Math.abs(r.tau - 12.445) < 0.01, 'tau ' + r.tau);          // hypot(4200, 762) / 343
+  assert(r.lagM === 0 && Math.abs(r.hBr - r.nowBr) < 1e-9);
+});
+test('radar: sound comes from where a moving plane was tau seconds ago', () => {
+  // 100 kt due east, 4 km north of you, level with you: tau = 4000 / sqrt(343^2 - 51.444^2)
+  const r = api.rdSolve({ distM: 4000, bearing: 0, altFt: 0, gs: 100, track: 90 }, 0, 343);
+  assert(Math.abs(r.tau - 11.795) < 0.01, 'tau ' + r.tau);
+  assert(Math.abs(r.he + 606.8) < 1, 'he ' + r.he);                  // it was 607 m further west
+  assert(Math.abs(r.nowBr) < 1e-9 && Math.abs(r.hBr - 351.38) < 0.1, 'hBr ' + r.hBr);
+  assert(Math.abs(Math.hypot(r.he, r.hn) / 343 - r.tau) < 1e-6);   // self-consistent
+});
+test('radar: report age moves the plane along its track, and very old reports are capped', () => {
+  const r = api.rdSolve({ distM: 1000, bearing: 0, altFt: 0, gs: 100, track: 90 }, 10, 343);
+  assert(Math.abs(r.e - 514.44) < 0.1 && Math.abs(r.n - 1000) < 1e-6);
+  const old = api.rdSolve({ distM: 1000, bearing: 0, altFt: 0, gs: 100, track: 90 }, 500, 343);
+  assert(Math.abs(old.e - 51.444 * 120) < 0.1);
+});
+test('radar: a fast jet flying away is placed kilometres behind where it is now', () => {
+  // level, 10 km north, 450 kt (231.5 m/s) straight away from you: tau = 10000 / (343 + 231.5)
+  const r = api.rdSolve({ distM: 10000, bearing: 0, altFt: 0, gs: 450, track: 0 }, 0, 343);
+  assert(Math.abs(r.tau - 17.41) < 0.02 && Math.abs(r.lagM - 4030) < 10, 'tau ' + r.tau + ' lag ' + r.lagM);
+  // and one crossing at right angles, high up, is self-consistent
+  const q = api.rdSolve({ distM: 10000, bearing: 90, altFt: 30000, gs: 450, track: 0 }, 0, 343);
+  assert(Math.abs(Math.hypot(q.he, q.hn, q.alt) / 343 - q.tau) < 1e-3, 'not converged: ' + q.tau);
 });
 test('radar: angle difference wraps around north', () => {
   assert.strictEqual(api.rdDiff(359, 2), 3);

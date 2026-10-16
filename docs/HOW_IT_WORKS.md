@@ -111,3 +111,12 @@ The app relies on one microphone and cannot determine direction from sound. All 
 ## Radar (Field tab)
 
 Under the search radius slider, a radar plots the aircraft from the latest ADS-B reply with the phone at the centre. Range rings are a third of the search radius each. Each aircraft is moved along its reported track and ground speed for the seconds since the reply (up to 2 minutes), so it keeps drifting between 15 s updates. The shaded wedge is the direction the phone points (+/-15 degrees), using the same "Aim with" setting and compass data as recording. Aircraft inside the wedge are highlighted and named under the radar. A button switches between pointing-up (the picture turns with you) and north-up. The compass streams only while the Field tab is open, to save battery. The wedge uses magnetic north until a location fix gives the declination (the first ADS-B request supplies it). The wedge compares bearing only, not elevation.
+
+### Contact details, ADS-B age and sound delay
+
+Tap an aircraft on the radar (or a row in the list) to open a detail card. Two delays are allowed for:
+
+- **ADS-B age.** Each aircraft's position is moved along its reported track and ground speed for its total age: the `seen_pos` the data service reports (how old the position was when sent), plus the time since the reply arrived, plus 1 s for the service itself. Reports are capped at 120 s of extrapolation.
+- **Sound delay.** The sound you hear now left the aircraft `tau` seconds ago, where `tau` = straight-line distance (ground distance and height) divided by the speed of sound. That distance depends on where the aircraft was, so the app solves it by iteration. The card shows *Look at* (where the aircraft is now) and *Sound from* (where it was `tau` seconds ago), each with how far to turn and tilt the phone. The beam highlight on the radar uses the sound position, because that is where you are listening toward.
+
+The speed of sound is fixed at 343 m/s (about 20 C) and shared with the recording matcher. Flight is assumed straight and steady, so a turning aircraft will drift from the estimate, and a 1 to 2 s timing error is roughly 50 to 100 m for a slow plane. The maths is in `rdSolve` and is covered by tests.
