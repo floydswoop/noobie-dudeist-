@@ -84,6 +84,7 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <canvas id="rdr" width="640" height="640" role="img" aria-label="Radar of nearby aircraft and the direction the phone points"></canvas>
 <div class="row"><button id="rdMode">Radar: pointing up</button></div>
 <p class="cap" id="rdCap"></p>
+<p class="cap" id="rdDbg"></p>
 <div class="rc" id="rdCard" hidden></div>
 <h2 style="font-size:20px;margin:20px 0 6px">Aircraft overhead</h2>
 <div class="row"><button id="oGo" class="main">What's overhead</button></div>
@@ -557,7 +558,7 @@ function onOverheadError(m){$('#oOut').textContent=m;ovErr=m;cbOvDone();cbRender
 function onOverhead(js){
   const r=JSON.parse(js),o=$('#oOut');
   const ac=r.ac.slice().sort((a,b)=>a.distM-b.distM).slice(0,12);
-  ovErr=null;ovLast={t:Date.now(),all:r.ac.length,near:ac[0]||null};rdSet(r.ac);cbOvDone();cbRender();
+  ovErr=null;ovLast={t:Date.now(),all:r.ac.length,near:ac[0]||null};rdFix=r.fix||null;rdSet(r.ac);cbOvDone();cbRender();
   if(!ac.length){o.textContent='No aircraft reported within that radius right now.';return}
   o.innerHTML=ac.map(a=>{
     const alt=typeof a.altFt==='number'?a.altFt:null,el=alt!==null?Math.round(Math.atan2(alt*.3048,a.distM)*180/Math.PI):null;
@@ -990,18 +991,20 @@ function prefSet(k,val){
 // ---- Radar: ADS-B contacts and the direction the phone points ----
 let rdAc=[],rdT=0,rdUp=true,rdSel=null,rdSelName='',rdHits=[];
 const SOUND_C=343;   // m/s, also used by the recording matcher
-const ADSB_LAG=1;    // seconds: allowance for the ADS-B data service itself
+const ADSB_LAG=1;
+const MAX_AGE=45;    // seconds: older reports are not extrapolated further (aircraft turn)
+let rdFix=null;      // last location fix reported by the phone    // seconds: allowance for the ADS-B data service itself
 const BEAM=15;
 const TYPE_NAMES={C152:'Cessna 152',C172:'Cessna 172 Skyhawk',C182:'Cessna 182',C206:'Cessna 206',C208:'Cessna Caravan',C210:'Cessna 210',C25A:'Cessna CitationJet',C510:'Cessna Citation Mustang',C525:'Cessna CitationJet',C560:'Cessna Citation V',C680:'Cessna Citation Sovereign',PA28:'Piper Cherokee/Warrior',PA32:'Piper Cherokee Six',PA34:'Piper Seneca',PA44:'Piper Seminole',PA46:'Piper Malibu',SR20:'Cirrus SR20',SR22:'Cirrus SR22',BE35:'Beech Bonanza',BE36:'Beech Bonanza A36',BE58:'Beech Baron',BE20:'Beech King Air 200',BE9L:'Beech King Air 90',DA40:'Diamond DA40',DA42:'Diamond DA42',M20P:'Mooney M20',R22:'Robinson R22',R44:'Robinson R44',R66:'Robinson R66',B06:'Bell 206',B407:'Bell 407',EC35:'Airbus EC135',H60:'Black Hawk',S76:'Sikorsky S-76',PC12:'Pilatus PC-12',TBM9:'Daher TBM 900',B737:'Boeing 737',B738:'Boeing 737-800',B739:'Boeing 737-900',B38M:'Boeing 737 MAX 8',B752:'Boeing 757-200',B763:'Boeing 767-300',B772:'Boeing 777-200',B77W:'Boeing 777-300ER',B788:'Boeing 787-8',B789:'Boeing 787-9',A319:'Airbus A319',A320:'Airbus A320',A321:'Airbus A321',A20N:'Airbus A320neo',A21N:'Airbus A321neo',A332:'Airbus A330-200',A333:'Airbus A330-300',A359:'Airbus A350-900',E170:'Embraer 170',E75L:'Embraer 175',E75S:'Embraer 175',CRJ2:'Bombardier CRJ-200',CRJ7:'Bombardier CRJ-700',CRJ9:'Bombardier CRJ-900',DH8D:'Dash 8 Q400',AT76:'ATR 72'};
 const typeName=c=>TYPE_NAMES[c]||c||'Unknown type';
 // Where an aircraft is now, and where the sound you hear now came from.
 // a: {distM, bearing, altFt, gs, track} as reported; ageS: how old that report is; c: speed of sound (m/s).
 // The sound left the aircraft tau seconds ago, and tau depends on how far away it was then, so iterate.
-function rdSolve(a,ageS,c){
+function rdSolve(a,ageS,c,hz){
   c=c||SOUND_C;
   const b=a.bearing*Math.PI/180,v=a.gs>0?a.gs*.51444:0,t=(a.track||0)*Math.PI/180;
-  const alt=typeof a.altFt==='number'?a.altFt*.3048:0;
-  const age=Math.min(Math.max(ageS||0,0),120);
+  const alt=(typeof a.altFt==='number'?a.altFt*.3048:0)-(hz||0);   // height above the phone
+  const age=Math.min(Math.max(ageS||0,0),MAX_AGE);
   const e=a.distM*Math.sin(b)+v*age*Math.sin(t),n=a.distM*Math.cos(b)+v*age*Math.cos(t);
   let tau=0,he=e,hn=n;
   for(let i=0;i<60;i++){he=e-v*tau*Math.sin(t);hn=n-v*tau*Math.cos(t);tau=Math.min(120,Math.hypot(he,hn,alt)/c)}
@@ -1029,6 +1032,7 @@ function rdTurn(az,el,hd){
   if(pe!==null)t+=', '+Math.abs(Math.round(de))+'° '+(de>=0?'up':'down');
   return t;
 }
+function rdHz(){return rdFix&&typeof rdFix.alt==='number'&&rdFix.acc<=100?rdFix.alt:0}
 function rdAgeOf(a){return(Date.now()-rdT)/1000+(a.seenPos||0)+ADSB_LAG}
 function rdSelect(hex){
   rdSel=hex||null;
@@ -1090,7 +1094,7 @@ function rdDraw(){
     g.fillStyle=l==='N'?fg:mut;g.fillText(l,x,y);
   });
   const pt=(p)=>[C+p.x*R,C-p.y*R];
-  const all=rdAc.map(a=>{const s=rdSolve(a,rdAgeOf(a));return{a,s,p:rdPlace(s.e,s.n,rangeM,rot)}})
+  const all=rdAc.map(a=>{const s=rdSolve(a,rdAgeOf(a),SOUND_C,rdHz());return{a,s,p:rdPlace(s.e,s.n,rangeM,rot)}})
     .filter(o=>o.p.r<=rangeM*1.02).sort((x,y)=>x.p.r-y.p.r);
   const list=all.slice(0,14);
   if(rdSel&&!list.some(o=>o.a.hex===rdSel)){const f=all.find(o=>o.a.hex===rdSel);if(f)list.push(f)}
@@ -1149,7 +1153,25 @@ function rdDraw(){
   }
   $('#rdCap').textContent=cap.join('; ')+'.';
   $('#rdMode').textContent=up?'Radar: pointing up (tap for north up)':'Radar: north up'+(rdUp&&hd===null?' (no compass yet)':' (tap for pointing up)');
+  rdDebug(hd);
   if(rdSel)rdCardUpdate(selO?selO.o:null,hd);
+}
+// A plain-language readout of where the numbers come from, to help find out why a marker is off.
+function rdDebug(hd){
+  const el=$('#rdDbg');if(!el)return;
+  const t=[];
+  if(rdFix){
+    t.push('Your location: within about '+Math.round(rdFix.acc)+' m'+(rdFix.provider?' ('+rdFix.provider+')':'')+', fix '+Math.max(0,Math.round(rdFix.ageS))+' s old'+(rdHz()?', height '+Math.round(rdHz())+' m used for angles':''));
+    if(rdFix.acc>100||rdFix.ageS>60)t.push('this location may be too rough or old, so markers can be shifted. Go outside, wait for GPS and scan again');
+  }else if(rdT)t.push('No location details received');
+  t.push(ptDecl===null?'north: magnetic only, so markers can be off by the local declination':'north: true north (declination '+(ptDecl>=0?'+':'')+Math.round(ptDecl)+'°)');
+  if(rdT&&rdAc.length){
+    const n=rdAc.filter(a=>typeof a.seenPos==='number').length;
+    t.push(n?n+' of '+rdAc.length+' aircraft report their position age':'the service sent no position age, so fast aircraft may lag');
+    const age=Math.round((Date.now()-rdT)/1000);
+    if(age>MAX_AGE)t.push('aircraft data is '+age+' s old, scan again');
+  }
+  el.textContent=t.join('. ')+'.';
 }
 function rdSet(ac){rdAc=ac;rdT=Date.now();rdDraw()}
 function compassWant(on){try{if(window.Android&&Android.startCompass){on?Android.startCompass():Android.stopCompass()}}catch(e){}}

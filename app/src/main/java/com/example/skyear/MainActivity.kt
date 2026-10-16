@@ -446,7 +446,12 @@ class MainActivity : ComponentActivity() {
                     ?: throw Exception("No location fix. Turn on location services and try again.")
                 setDeclinationFrom(loc)
                 val out = queryAircraft(loc.latitude, loc.longitude, radiusNm)
-                sendToPage("onOverhead", JSONObject().put("ac", out).toString())
+                val fix = JSONObject()
+                    .put("acc", loc.accuracy.toDouble())
+                    .put("ageS", (System.currentTimeMillis() - loc.time) / 1000.0)
+                    .put("provider", loc.provider ?: "")
+                if (loc.hasAltitude()) fix.put("alt", loc.altitude)
+                sendToPage("onOverhead", JSONObject().put("ac", out).put("fix", fix).toString())
             } catch (e: Exception) {
                 sendToPage("onOverheadError", "Could not get aircraft: ${e.message}")
             }

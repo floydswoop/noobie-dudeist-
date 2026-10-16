@@ -181,11 +181,11 @@ test('radar: sound comes from where a moving plane was tau seconds ago', () => {
   assert(Math.abs(r.nowBr) < 1e-9 && Math.abs(r.hBr - 351.38) < 0.1, 'hBr ' + r.hBr);
   assert(Math.abs(Math.hypot(r.he, r.hn) / 343 - r.tau) < 1e-6);   // self-consistent
 });
-test('radar: report age moves the plane along its track, and very old reports are capped', () => {
+test('radar: report age moves the plane along its track, and reports older than 45 s are capped', () => {
   const r = api.rdSolve({ distM: 1000, bearing: 0, altFt: 0, gs: 100, track: 90 }, 10, 343);
   assert(Math.abs(r.e - 514.44) < 0.1 && Math.abs(r.n - 1000) < 1e-6);
   const old = api.rdSolve({ distM: 1000, bearing: 0, altFt: 0, gs: 100, track: 90 }, 500, 343);
-  assert(Math.abs(old.e - 51.444 * 120) < 0.1);
+  assert(Math.abs(old.e - 51.444 * 45) < 0.1);
 });
 test('radar: a fast jet flying away is placed kilometres behind where it is now', () => {
   // level, 10 km north, 450 kt (231.5 m/s) straight away from you: tau = 10000 / (343 + 231.5)
@@ -194,6 +194,12 @@ test('radar: a fast jet flying away is placed kilometres behind where it is now'
   // and one crossing at right angles, high up, is self-consistent
   const q = api.rdSolve({ distM: 10000, bearing: 90, altFt: 30000, gs: 450, track: 0 }, 0, 343);
   assert(Math.abs(Math.hypot(q.he, q.hn, q.alt) / 343 - q.tau) < 1e-3, 'not converged: ' + q.tau);
+});
+test('radar: heights are measured from the phone, not from sea level', () => {
+  // plane at 2500 ft above sea level, phone on a hill 300 m above sea level: only 462 m above the phone
+  const r = api.rdSolve({ distM: 3000, bearing: 0, altFt: 2500, gs: 0, track: 0 }, 0, 343, 300);
+  assert(Math.abs(r.alt - 462) < 0.5, 'alt ' + r.alt);
+  assert(Math.abs(r.nowEl - Math.atan2(462, 3000) * 180 / Math.PI) < 0.01);
 });
 test('radar: angle difference wraps around north', () => {
   assert.strictEqual(api.rdDiff(359, 2), 3);
