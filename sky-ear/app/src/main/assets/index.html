@@ -6,10 +6,10 @@
 <title>Sky Ear</title>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
---bg:#eef0ee;--fg:#16201c;--mut:#5b6862;--card:#fff;--ac:#0b6e5a;--acfg:#fff;--bd:#c9d0cc}
+--bg:#eef0ee;--fg:#16201c;--mut:#5b6862;--card:#fff;--ac:#0b6e5a;--acfg:#fff;--bd:#c9d0cc;--fl:#b3480b;--flfg:#fff}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731}}
-:root[data-theme="dark"]{--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731;--fl:#ffb454;--flfg:#2a1600}}
+:root[data-theme="dark"]{--bg:#0f1512;--fg:#e4ece8;--mut:#8fa098;--card:#18211d;--ac:#4fd1b0;--acfg:#06201a;--bd:#2a3731;--fl:#ffb454;--flfg:#2a1600}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 "Barlow Condensed","Arial Narrow",system-ui,sans-serif}
 main{max-width:560px;margin:0 auto;padding:16px}
@@ -21,10 +21,15 @@ button.main{flex:1;background:var(--ac);color:var(--acfg);border-color:var(--ac)
 button:disabled{opacity:.45}
 .tabs{gap:4px}.tabs button{flex:1;padding:10px 2px;font-size:14px}
 #cList button{text-align:left}small{color:var(--mut);font-weight:400}.tabs .sel{background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+.tabs #tOv{color:var(--fl);border-color:var(--fl);font-weight:700}
+.tabs #tOv.sel{background:var(--fl);color:var(--flfg);border-color:var(--fl)}
+#cbGo{background:var(--fl);color:var(--flfg);border-color:var(--fl);min-height:56px;font-size:18px}
+#cbGo:focus-visible,.tabs #tOv:focus-visible{outline-color:var(--fl)}
 .stack{display:grid;gap:8px}.stack button{width:100%}.res p{margin:6px 0}
 select{font:inherit;font-weight:600;width:100%;min-height:44px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 10px;margin-bottom:4px}
 button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
 canvas{width:100%;height:120px;display:block;background:#000;border-radius:8px}
+canvas#rdr{height:auto;aspect-ratio:1;max-width:440px;margin:8px auto 4px;background:var(--card);border:1px solid var(--bd)}
 .cap{color:var(--mut);font-size:13px;margin:4px 0 12px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:12px 0}
@@ -36,8 +41,8 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <main>
 <h1>Sky Ear</h1>
 <p class="mut">Use headphones. Phone speakers can't reproduce low tones.</p>
-<div class="row tabs"><button id="tSyn" class="sel">Synth</button><button id="tQz">Quiz</button><button id="tLs">Listen</button><button id="tOv">Field</button><button id="tLb">Library</button></div>
-<section id="syn">
+<div class="row tabs"><button id="tOv" class="sel">Field</button><button id="tSyn">Synth</button><button id="tQz">Quiz</button><button id="tLs">Listen</button><button id="tLb">Library</button></div>
+<section id="syn" hidden>
 <div class="row"><button id="go" class="main">Start</button><button id="fly" disabled>Fly-by</button></div>
 <canvas id="sp" width="320" height="120"></canvas>
 <div class="cap">Spectrogram, 0 to 5 kHz, newest on the right</div>
@@ -60,10 +65,16 @@ input[type=range]{grid-column:1/3;width:100%;accent-color:var(--ac);height:28px}
 <div id="lOut" class="res"></div>
 <div class="stack"><button id="lUse" hidden>Copy best match to Synth</button></div>
 </section>
-<section id="ovh" hidden>
-<p class="mut">Shows aircraft near you from public ADS-B data. This sends your approximate location to the data service (api.adsb.lol). Works in the Android app only.</p>
-<div class="row"><button id="oGo" class="main">What's overhead</button></div>
+<section id="ovh">
+<p class="mut">One tap listens through the microphone, checks public ADS-B data for aircraft near you every 15 seconds, and scans for drones broadcasting Remote ID. This sends your approximate location to the data service (api.adsb.lol). Android app only.</p>
+<div class="row"><button id="cbGo" class="main">Start scan</button></div>
+<div id="cbOut" class="res"></div>
 <label><span>Search radius</span><b id="oR"></b><input type="range" id="oRad" min="5" max="50" step="5" value="15"></label>
+<canvas id="rdr" width="640" height="640" role="img" aria-label="Radar of nearby aircraft and the direction the phone points"></canvas>
+<div class="row"><button id="rdMode">Radar: pointing up</button></div>
+<p class="cap" id="rdCap"></p>
+<h2 style="font-size:20px;margin:20px 0 6px">Aircraft overhead</h2>
+<div class="row"><button id="oGo" class="main">What's overhead</button></div>
 <div id="oOut" class="res"></div>
 <h2 style="font-size:20px;margin:20px 0 6px">Broadcasting drones (Remote ID)</h2>
 <p class="mut">Listens for the standard Remote ID signals that drones broadcast over Bluetooth and Wi-Fi. It only shows drones that broadcast, within roughly a few hundred meters. Android app only.</p>
@@ -212,7 +223,7 @@ $('#go').onclick=async()=>{
   mg.gain.setTargetAtTime(on?.8:0,ctx.currentTime,.05);
   $('#go').textContent=on?'Stop':'Start';
   $('#fly').disabled=!on;
-  if(on)draw();else setTimeout(()=>{if(!on)ctx.suspend()},300);
+  if(on)draw();else setTimeout(()=>{if(!on&&!cbMic&&!lOn)ctx.suspend()},300);
 };
 
 // Fly-by: 18 m/s pass at the Distance setting, with Doppler shift, level and filter changes
@@ -349,6 +360,7 @@ function tab(w){
   $('#go').textContent='Start';$('#fly').disabled=true;
   if(w!=='lsn'&&lOn)lStop();
   if(w==='cls')libList();
+  compassWant(w==='ovh');if(w==='ovh')rdDraw();
   if(w==='syn')P.forEach(p=>{els[p[0]].i.value=v[p[0]];els[p[0]].show()});
 }
 $('#tSyn').onclick=()=>tab('syn');$('#tQz').onclick=()=>tab('qz');$('#tLs').onclick=()=>tab('lsn');$('#tOv').onclick=()=>tab('ovh');$('#tLb').onclick=()=>tab('cls');
@@ -523,10 +535,11 @@ $('#oGo').onclick=()=>{
   $('#oOut').textContent='Getting your location and nearby aircraft...';
   Android.requestOverhead(+$('#oRad').value);
 };
-function onOverheadError(m){$('#oOut').textContent=m}
+function onOverheadError(m){$('#oOut').textContent=m;ovErr=m;cbOvDone();cbRender()}
 function onOverhead(js){
   const r=JSON.parse(js),o=$('#oOut');
   const ac=r.ac.slice().sort((a,b)=>a.distM-b.distM).slice(0,12);
+  ovErr=null;ovLast={t:Date.now(),all:r.ac.length,near:ac[0]||null};rdSet(r.ac);cbOvDone();cbRender();
   if(!ac.length){o.textContent='No aircraft reported within that radius right now.';return}
   o.innerHTML=ac.map(a=>{
     const alt=typeof a.altFt==='number'?a.altFt:null,el=alt!==null?Math.round(Math.atan2(alt*.3048,a.distM)*180/Math.PI):null;
@@ -544,6 +557,7 @@ const CLIP='https://skyear.local/clips/';
 $('#rGo').onclick=()=>{
   if(!window.Android){$('#rSt').textContent='Recording works in the Android app only.';return}
   if(rOn){Android.stopRecording();$('#rSt').textContent='Finishing up and saving...';return}
+  if(cbOn)cbMicStop();
   $('#rSt').textContent='Starting...';
   Android.startRecording(+$('#oRad').value);
 };
@@ -716,14 +730,16 @@ function llDelta(a,b,c,d){const p=Math.PI/180,x=(d-b)*p*Math.cos((a+c)/2*p),y=(c
 const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
 $('#idGo').onclick=()=>{
   if(!window.Android||!Android.startRid){$('#idSt').textContent='Remote ID scanning works in the Android app only.';return}
-  if(ridOn){Android.stopRid();return}
+  if(ridOn){ridUserStop=true;Android.stopRid();return}
+  ridUserStop=false;
   $('#idSt').textContent='Starting...';Android.startRid();
 };
 function onRidState(m){
-  if(m==='started'){ridOn=true;ridU={};$('#idGo').textContent='Stop scanning';$('#idSt').textContent='Scanning...';$('#idList').textContent='No broadcasting drones heard yet.'}
-  else if(m.startsWith('info:'))$('#idSt').textContent='Scanning. '+m.slice(5);
+  if(m==='started'){ridOn=true;ridErr=null;ridU={};$('#idGo').textContent='Stop scanning';$('#idSt').textContent='Scanning...';$('#idList').textContent='No broadcasting drones heard yet.'}
+  else if(m.startsWith('info:')){ridInfo=m.slice(5);$('#idSt').textContent='Scanning. '+ridInfo}
   else if(m==='stopped'){ridOn=false;$('#idGo').textContent='Start scanning';$('#idSt').textContent='Scanning stopped.'}
-  else{ridOn=false;$('#idGo').textContent='Start scanning';$('#idSt').textContent=m.replace(/^error:/,'')}
+  else{ridOn=false;ridErr=m.replace(/^error:/,'');$('#idGo').textContent='Start scanning';$('#idSt').textContent=ridErr}
+  cbRender();
 }
 function ridSample(){
   ridLogT=Date.now();
@@ -738,6 +754,7 @@ function onRidBatch(js){
   if(r.lat!=null)ridPhone={lat:r.lat,lon:r.lon};
   r.obs.forEach(ridAdd);
   ridRender();
+  cbRender();
   if(rOn&&Date.now()-ridLogT>5000)ridSample();
 }
 function ridRender(){
@@ -788,13 +805,13 @@ function onOrient(js){
   if(o.d!=null)ptDecl=o.d;
   const a=ptCalc(o.r,1),b=ptCalc(o.r,2);
   ptNow={az:a.az,el:a.el,az2:b.az,el2:b.el,acc:o.a};
-  ptRender();
+  ptRender();rdDraw();
   if(rOn&&o.t-ptLast>=500){
     ptLast=o.t;
     ptLog.push({t:o.t,azm:+a.az.toFixed(1),el:+a.el.toFixed(1),azm2:+b.az.toFixed(1),el2:+b.el.toFixed(1),acc:o.a});
   }
 }
-function onOrientError(m){$('#ptLive').textContent=m}
+function onOrientError(m){$('#ptLive').textContent=m;if($('#rdCap'))$('#rdCap').textContent=m}
 function ptRender(){
   const mode=+$('#ptMode').value,az=((mode===2?ptNow.az2:ptNow.az)+(ptDecl||0)+360)%360,el=mode===2?ptNow.el2:ptNow.el;
   let t='Pointing '+Math.round(az)+'° '+cmp(az)+', '+Math.round(Math.abs(el))+'° '+(el>=0?'above':'below')+' the horizon';
@@ -814,6 +831,129 @@ function ptHtml(m){
   return h;
 }
 
+
+// ---- Combined scan: microphone + ADS-B + Remote ID, started with one button ----
+let cbOn=false,cbMic=null,cbSrc=null,cbAn=null,cbTimer=null,cbPing=null,cbSnd=null,cbMicErr=null,cbMicBusy=false,
+    cbOvBusy=false,cbOvT=0,cbOvRes=null,cbTok=0,ovLast=null,ovErr=null,ridInfo='',ridErr=null,ridUserStop=false;
+
+// Turns the latest readings into three plain-text lines. No browser needed, so it can be tested.
+function cbSummary(x){
+  const out={};
+  if(x.rec)out.sound='Paused while a clip is recording.';
+  else if(x.micErr)out.sound=x.micErr;
+  else if(!x.snd)out.sound='Listening...';
+  else if(x.snd.quiet)out.sound='Too quiet to analyze. Point the phone toward the sound.';
+  else if(!x.snd.mt)out.sound='No clear repeating tone.';
+  else out.sound='Tone at '+Math.round(x.snd.f0)+' Hz, '+x.snd.count+' of 8 harmonics. Closest presets: '+x.snd.mt.map(m=>m.n+' ('+(m.dr?'drone':'not a drone')+')').join(', ')+'.';
+
+  if(x.ovErr)out.air=x.ovErr;
+  else if(!x.ov)out.air='Checking for aircraft...';
+  else if(!x.ov.all)out.air='No aircraft reported nearby.';
+  else{
+    const a=x.ov.near,alt=typeof a.altFt==='number'?a.altFt:null,p=[(a.distM/1000).toFixed(1)+' km '+cmp(a.bearing)];
+    if(alt!==null){p.push(alt.toLocaleString()+' ft');p.push(Math.round(Math.atan2(alt*.3048,a.distM)*180/Math.PI)+'° above the horizon')}
+    else if(a.altFt==='ground')p.push('on ground');
+    out.air=x.ov.all+' aircraft nearby. Nearest: '+(a.type||'?')+' '+(a.flight||a.hex)+', '+p.join(', ')+'. Updated '+Math.max(0,Math.round((x.now-x.ov.t)/1000))+' s ago.';
+  }
+
+  if(!x.ridOn)out.drone=x.ridErr?'Drone scan could not start: '+x.ridErr:'Drone scan is off.';
+  else if(!x.rid.length)out.drone='None heard yet. '+(x.ridInfo?x.ridInfo+' ':'')+'Only drones that broadcast Remote ID can be heard, within a few hundred meters.';
+  else{
+    const L=x.rid.map(u=>{
+      const d=u.lat!=null&&x.phone?llDelta(x.phone.lat,x.phone.lon,u.lat,u.lon):null;
+      return{u,d,t:(u.id||'Unknown ID')+(u.uaType!=null?' ('+UAT[u.uaType]+')':'')+(d?', '+fmtD(d.m)+' '+cmp(d.br)+' of you':'')};
+    }).sort((a,b)=>(a.d?a.d.m:1e12)-(b.d?b.d.m:1e12));
+    out.drone=L.length+' broadcasting: '+L.slice(0,3).map(e=>e.t).join('; ')+(L.length>3?'; and '+(L.length-3)+' more':'')+'.';
+  }
+  return out;
+}
+function cbRender(){
+  if(!cbOn)return;
+  const now=Date.now(),s=cbSummary({rec:rOn,micErr:cbMicErr,snd:cbSnd,ovErr,ov:ovLast,ridOn,ridErr,ridInfo,phone:ridPhone,now,
+    rid:Object.values(ridU).filter(u=>now-u.seen<60000)});
+  $('#cbOut').innerHTML='<p><b>Sound</b><br>'+esc(s.sound)+'</p><p><b>Aircraft</b><br>'+esc(s.air)+'</p><p><b>Drone signals</b><br>'+esc(s.drone)+'</p>';
+}
+function setCbUi(on,label){
+  $('#cbGo').textContent=label||(on?'Stop scan':'Start scan');
+  $('#tOv').textContent=on?'Field \u2022':'Field';
+}
+async function cbMicStart(){
+  if(cbMic||cbMicBusy)return;
+  cbMicBusy=true;
+  try{
+    if(!ctx)init();
+    await ctx.resume();
+    if(lOn)lStop();
+    const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    if(!cbOn){st.getTracks().forEach(t=>t.stop());return}
+    cbMic=st;cbMicErr=null;
+    st.getAudioTracks().forEach(t=>{t.onended=()=>{if(cbMic===st){cbMicStop();cbMicErr='The microphone stopped. It will restart on the next check.';cbRender()}}});
+    cbSrc=ctx.createMediaStreamSource(st);cbAn=ctx.createAnalyser();
+    cbAn.fftSize=8192;cbAn.smoothingTimeConstant=.7;cbAn.minDecibels=-110;cbAn.maxDecibels=-10;
+    cbSrc.connect(cbAn);
+    cbTimer=setInterval(cbListen,700);
+  }catch(e){
+    cbMicErr='Microphone unavailable ('+(e&&e.name||'error')+'). Allow microphone access for the app.';
+  }finally{cbMicBusy=false}
+}
+function cbMicStop(){
+  clearInterval(cbTimer);cbTimer=null;
+  if(cbMic)cbMic.getTracks().forEach(t=>t.stop());
+  if(cbSrc){try{cbSrc.disconnect()}catch(e){}}
+  cbMic=null;cbSrc=null;cbAn=null;
+}
+function cbListen(){
+  if(!cbAn||rOn)return;
+  const d=new Float32Array(cbAn.frequencyBinCount);
+  cbAn.getFloatFrequencyData(d);
+  cbSnd=analyze(d,ctx.sampleRate);
+  cbRender();
+}
+function cbOvDone(){
+  cbOvBusy=false;
+  if(cbOvRes){const r=cbOvRes;cbOvRes=null;r()}
+}
+// Asks Android for nearby aircraft. The promise settles when an answer (or an error) comes back, or after 45 s.
+function cbPingNow(){
+  if(rOn||(cbOvBusy&&Date.now()-cbOvT<20000))return Promise.resolve();
+  cbOvBusy=true;cbOvT=Date.now();
+  const p=new Promise(res=>{cbOvRes=res;setTimeout(res,45000)});
+  Android.requestOverhead(+$('#oRad').value);
+  return p;
+}
+function cbTick(){
+  if(!cbOn)return;
+  cbPingNow();
+  if(!cbMic&&!cbMicBusy&&!rOn)cbMicStart();
+  if(!ridOn&&!ridUserStop&&!ridErr)Android.startRid();   // e.g. Android paused scanning while the app was in the background
+  cbRender();
+}
+async function cbStart(){
+  if(cbOn)return;
+  if(!window.Android||!Android.requestOverhead||!Android.startRid){$('#cbOut').textContent='The combined scan works in the Android app only.';return}
+  if(rOn){$('#cbOut').textContent='Stop the recording first, then start the scan.';return}
+  const tok=++cbTok;
+  cbOn=true;cbSnd=null;cbMicErr=null;ovLast=null;ovErr=null;ridUserStop=false;ridErr=null;
+  setCbUi(true,'Starting...');cbRender();
+  // One permission prompt at a time: microphone, then location (aircraft), then Bluetooth and nearby devices (drones).
+  await cbMicStart();
+  if(!cbOn||tok!==cbTok)return;
+  await cbPingNow();
+  if(!cbOn||tok!==cbTok)return;
+  cbPing=setInterval(cbTick,15000);
+  if(!ridOn)Android.startRid();
+  setCbUi(true);cbRender();
+}
+function cbStop(){
+  cbTok++;cbOn=false;
+  clearInterval(cbPing);cbPing=null;
+  cbMicStop();cbOvDone();
+  if(ridOn){ridUserStop=true;Android.stopRid()}
+  setCbUi(false);
+  $('#cbOut').textContent='Scan stopped.';
+}
+$('#cbGo').onclick=()=>cbOn?cbStop():cbStart();
+
 // ---- Remembered settings (saved on the phone, kept between launches) ----
 function prefGet(k){
   try{if(window.Android&&Android.getPref)return Android.getPref(k)}catch(e){}
@@ -828,6 +968,108 @@ function prefSet(k,val){
   if(saved==='1'||saved==='2')sel.value=saved;
   sel.addEventListener('change',()=>{prefSet('ptMode',sel.value);if(ptNow)ptRender()});
 })();
+
+// ---- Radar: ADS-B contacts and the direction the phone points ----
+let rdAc=[],rdT=0,rdUp=true;
+// East/north metres of an aircraft now: its reported position, moved along its track for the time since the report.
+function rdGeom(a,ageS){
+  const b=a.bearing*Math.PI/180;let e=a.distM*Math.sin(b),n=a.distM*Math.cos(b);
+  if(a.gs>0&&typeof a.track==='number'&&ageS>0&&ageS<120){const d=a.gs*.5144*ageS,t=a.track*Math.PI/180;e+=d*Math.sin(t);n+=d*Math.cos(t)}
+  return{e,n};
+}
+// Screen position (unit radius 1 = edge of radar, x right, y up). rot = compass bearing that points up.
+function rdPlace(e,n,rangeM,rot){
+  const r=Math.hypot(e,n),th=(Math.atan2(e,n)-rot*Math.PI/180);
+  return{x:r/rangeM*Math.sin(th),y:r/rangeM*Math.cos(th),r,bearing:(Math.atan2(e,n)*180/Math.PI+360)%360};
+}
+const rdDiff=(a,b)=>Math.abs(((a-b+540)%360)-180);
+function rdHeading(){
+  if(!ptNow)return null;
+  const mode=+$('#ptMode').value;
+  return((mode===2?ptNow.az2:ptNow.az)+(ptDecl||0)+360)%360;
+}
+const BEAM=15;
+function rdDraw(){
+  const cv=$('#rdr');
+  if(!cv||!window.getComputedStyle||$('#ovh').hidden)return;
+  const g=cv.getContext('2d'),W=cv.width,C=W/2,R=W/2-46,cs=getComputedStyle(document.documentElement);
+  const col=(n,d)=>cs.getPropertyValue(n).trim()||d,fg=col('--fg','#16201c'),mut=col('--mut','#5b6862'),ac=col('--ac','#0b6e5a'),bd=col('--bd','#c9d0cc'),card=col('--card','#fff');
+  const rangeM=+$('#oRad').value*1852,hd=rdHeading(),up=rdUp&&hd!==null,rot=up?hd:0;
+  const pt=(x,y)=>[C+x*R,C-y*R];
+  g.fillStyle=card;g.fillRect(0,0,W,W);
+  g.font='600 24px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
+  // beam
+  if(hd!==null){
+    const a0=(hd-rot-BEAM-90)*Math.PI/180,a1=(hd-rot+BEAM-90)*Math.PI/180;
+    g.beginPath();g.moveTo(C,C);g.arc(C,C,R,a0,a1);g.closePath();
+    g.globalAlpha=.18;g.fillStyle=ac;g.fill();g.globalAlpha=1;
+    const am=(hd-rot-90)*Math.PI/180;
+    g.strokeStyle=ac;g.lineWidth=3;g.beginPath();g.moveTo(C,C);g.lineTo(C+Math.cos(am)*R,C+Math.sin(am)*R);g.stroke();
+  }
+  // rings
+  g.strokeStyle=bd;g.lineWidth=2;g.fillStyle=mut;
+  for(let k=1;k<=3;k++){
+    g.beginPath();g.arc(C,C,R*k/3,0,Math.PI*2);g.stroke();
+    const nm=(+$('#oRad').value*k/3),lab=(Math.round(nm*10)/10)+' nm';
+    g.textAlign='left';g.font='600 20px system-ui,sans-serif';g.fillText(lab,C+6,C-R*k/3+14);
+  }
+  g.beginPath();g.moveTo(C-R,C);g.lineTo(C+R,C);g.moveTo(C,C-R);g.lineTo(C,C+R);g.stroke();
+  // compass letters
+  g.font='700 26px system-ui,sans-serif';g.textAlign='center';
+  [['N',0],['E',90],['S',180],['W',270]].forEach(([l,b])=>{
+    const t=(b-rot)*Math.PI/180,x=C+Math.sin(t)*(R+26),y=C-Math.cos(t)*(R+26);
+    g.fillStyle=l==='N'?fg:mut;g.fillText(l,x,y);
+  });
+  // aircraft
+  const age=(Date.now()-rdT)/1000,list=rdAc.map(a=>{const q=rdGeom(a,age);return{a,p:rdPlace(q.e,q.n,rangeM,rot)}})
+    .filter(o=>o.p.r<=rangeM*1.02).sort((x,y)=>x.p.r-y.p.r).slice(0,14);
+  let inBeam=[];
+  list.forEach((o,i)=>{
+    const [x,y]=pt(o.p.x,o.p.y),hit=hd!==null&&rdDiff(o.p.bearing,hd)<=BEAM;
+    if(hit)inBeam.push(o.a);
+    const tr=typeof o.a.track==='number'?(o.a.track-rot)*Math.PI/180:null;
+    g.fillStyle=hit?ac:fg;g.strokeStyle=card;g.lineWidth=2;
+    g.beginPath();
+    if(tr===null){g.arc(x,y,9,0,Math.PI*2)}
+    else{
+      const f=(d,s)=>[x+Math.sin(tr+d)*s,y-Math.cos(tr+d)*s];
+      const p1=f(0,16),p2=f(2.5,11),p3=f(Math.PI,5),p4=f(-2.5,11);
+      g.moveTo(...p1);g.lineTo(...p2);g.lineTo(...p3);g.lineTo(...p4);g.closePath();
+    }
+    g.fill();g.stroke();
+    if(i<8||hit){
+      const alt=typeof o.a.altFt==='number'?' '+(o.a.altFt>=1000?(o.a.altFt/1000).toFixed(1)+'k':o.a.altFt):'';
+      g.font=(hit?'700 ':'600 ')+'22px system-ui,sans-serif';g.fillStyle=hit?ac:fg;
+      g.textAlign=x>C?'left':'right';g.strokeStyle=card;g.lineWidth=4;
+      const t=((o.a.flight||o.a.reg||o.a.type||o.a.hex||'?').trim()+alt),tx=x+(x>C?14:-14);
+      g.strokeText(t,tx,y-16);g.fillText(t,tx,y-16);
+    }
+  });
+  // you
+  g.fillStyle=fg;g.beginPath();g.arc(C,C,7,0,Math.PI*2);g.fill();
+  // message when empty
+  g.textAlign='center';g.fillStyle=mut;g.font='600 24px system-ui,sans-serif';
+  if(!rdT)g.fillText('Tap Start scan to plot aircraft',C,C+R*.5);
+  else if(!list.length)g.fillText('No aircraft in range',C,C+R*.5);
+  // caption
+  let cap=[];
+  if(hd!==null){
+    const el=ptNow?(+$('#ptMode').value===2?ptNow.el2:ptNow.el):0;
+    cap.push('Pointing '+Math.round(hd)+'° '+cmp(hd)+', '+Math.round(Math.abs(el))+'° '+(el>=0?'above':'below')+' the horizon');
+    if(ptDecl===null)cap.push('magnetic north until your location is known');
+  }else cap.push(window.Android?'Waiting for the compass':'Compass works in the Android app only');
+  if(rdT){
+    if(hd!==null)cap.push(inBeam.length?'in the beam: '+inBeam.slice(0,3).map(a=>(a.flight||a.reg||a.hex||'?').trim()).join(', '):'nothing in the beam');
+    cap.push('aircraft positions '+Math.round(age)+' s old, moved along their tracks');
+  }
+  $('#rdCap').textContent=cap.join('; ')+'.';
+  $('#rdMode').textContent=up?'Radar: pointing up (tap for north up)':'Radar: north up'+(rdUp&&hd===null?' (no compass yet)':' (tap for pointing up)');
+}
+function rdSet(ac){rdAc=ac;rdT=Date.now();rdDraw()}
+function compassWant(on){try{if(window.Android&&Android.startCompass){on?Android.startCompass():Android.stopCompass()}}catch(e){}}
+$('#rdMode').onclick=()=>{rdUp=!rdUp;prefSet('rdUp',rdUp?'1':'0');rdDraw()};
+$('#oRad').addEventListener('input',rdDraw);
+(()=>{const s=prefGet('rdUp');if(s==='0')rdUp=false;rdDraw();compassWant(true);if(window.Android)setInterval(rdDraw,1000)})();
 </script>
 </body>
 </html>

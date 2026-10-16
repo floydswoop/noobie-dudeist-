@@ -90,6 +90,24 @@ The Android rotation-vector sensor gives a 3x3 matrix `R` that turns phone axes 
 
 Kotlin only forwards the raw bytes as hex. All decoding is in the page, which is why it can be tested against messages produced by the reference library.
 
+## Combined scan (Field tab)
+
+The **Start scan** button runs three things together and shows one readout (Sound, Aircraft, Drone signals):
+
+1. **Microphone.** `getUserMedia` with echo cancellation, noise suppression and auto gain turned off, an 8192-point analyser, and the same `analyze()` used by the Listen tab, about every 0.7 s.
+2. **Aircraft.** `Android.requestOverhead()` immediately and then every 15 s, using the search radius slider. Answers arrive through `onOverhead` / `onOverheadError`.
+3. **Drone signals.** `Android.startRid()`. If Android pauses scanning (for example while the app is in the background) the 15-second check starts it again, unless you stopped it by hand or Android reported an error such as a denied permission.
+
+The steps start one after another, because Android shows one permission prompt at a time: microphone, then location, then Bluetooth and nearby devices. A failure in one step (for example a denied microphone) does not stop the others.
+
+Starting a recording while the scan runs releases the scan's microphone and pauses aircraft checks, since the recording takes its own aircraft snapshots; Remote ID scanning continues and is logged into the clip. The Field tab shows a dot while the scan runs.
+
+`cbSummary()` turns the latest readings into the three text lines and has no browser dependencies, so it is covered by `tests/run-tests.js`.
+
 ## Limitations of the design
 
 The app relies on one microphone and cannot determine direction from sound. All matching is approximate and uses public, unverified data. See the README for the full list.
+
+## Radar (Field tab)
+
+Under the search radius slider, a radar plots the aircraft from the latest ADS-B reply with the phone at the centre. Range rings are a third of the search radius each. Each aircraft is moved along its reported track and ground speed for the seconds since the reply (up to 2 minutes), so it keeps drifting between 15 s updates. The shaded wedge is the direction the phone points (+/-15 degrees), using the same "Aim with" setting and compass data as recording. Aircraft inside the wedge are highlighted and named under the radar. A button switches between pointing-up (the picture turns with you) and north-up. The compass streams only while the Field tab is open, to save battery. The wedge uses magnetic north until a location fix gives the declination (the first ADS-B request supplies it). The wedge compares bearing only, not elevation.

@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
     // Phone orientation (compass and tilt) while recording
     private var sensorListener: SensorEventListener? = null
     @Volatile private var declination: Float? = null
+    @Volatile private var compassWanted = false   // the Field tab radar wants the compass
     @Volatile private var sensorAcc = 0
     private var lastOrientSent = 0L
 
@@ -149,6 +150,25 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun requestOverhead(radiusNm: Int) {
             runOnUiThread { startOverhead(radiusNm) }
+        }
+
+        @JavascriptInterface
+        fun startCompass() {
+            runOnUiThread {
+                compassWanted = true
+                if (!startOrientation()) {
+                    sendToPage("onOrientError", "No compass sensor found, so the radar cannot show where you point.")
+                }
+                primeDeclination()
+            }
+        }
+
+        @JavascriptInterface
+        fun stopCompass() {
+            runOnUiThread {
+                compassWanted = false
+                if (!recording) stopOrientation()
+            }
         }
 
         @JavascriptInterface
@@ -419,6 +439,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val loc = getFix()
                     ?: throw Exception("No location fix. Turn on location services and try again.")
+                setDeclinationFrom(loc)
                 val out = queryAircraft(loc.latitude, loc.longitude, radiusNm)
                 sendToPage("onOverhead", JSONObject().put("ac", out).toString())
             } catch (e: Exception) {
@@ -551,6 +572,7 @@ class MainActivity : ComponentActivity() {
 
     // Sends the phone's rotation matrix to the page about 10 times a second; the page works out the direction.
     private fun startOrientation(): Boolean {
+        if (sensorListener != null) return true
         val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return false
         val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return false
         val l = object : SensorEventListener {
@@ -576,6 +598,28 @@ class MainActivity : ComponentActivity() {
         sm.registerListener(l, sensor, SensorManager.SENSOR_DELAY_UI)
         sensorListener = l
         return true
+    }
+
+    private fun setDeclinationFrom(loc: Location) {
+        try {
+            declination = GeomagneticField(
+                loc.latitude.toFloat(), loc.longitude.toFloat(), loc.altitude.toFloat(), System.currentTimeMillis()
+            ).declination
+        } catch (e: Exception) {
+            // leave declination unknown
+        }
+    }
+
+    // Looks up true-north correction once a location is available (needed outside recording too).
+    private fun primeDeclination() {
+        if (declination != null || !hasLocation()) return
+        Thread {
+            try {
+                getFix()?.let { setDeclinationFrom(it) }
+            } catch (e: Exception) {
+                // ignore; the page falls back to magnetic north
+            }
+        }.start()
     }
 
     private fun stopOrientation() {
@@ -647,7 +691,7 @@ class MainActivity : ComponentActivity() {
     private fun finishRecording(st: RecState, sr: Int, radius: Int) {
         runOnUiThread {
             web.keepScreenOn = false
-            stopOrientation()
+            if (!compassWanted) stopOrientation()
         }
         val wav = File(clipsDir(), "${st.id}.wav")
         if (st.totalBytes <= 0L) {
@@ -881,6 +925,12 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         stopRidScan("stopped")
+        if (!recording) stopOrientation()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (compassWanted) startOrientation()
     }
 
     override fun onDestroy() {

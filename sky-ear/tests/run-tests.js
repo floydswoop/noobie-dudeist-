@@ -21,7 +21,7 @@ global.performance = { now: () => 0 };
 global.requestAnimationFrame = () => {};
 global.window = global;
 
-const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, LIB}')();
+const api = new Function(js + ';return {ridParse, ptCalc, sources, analyze, llDelta, cbSummary, rdGeom, rdPlace, rdDiff, LIB}')();
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -121,6 +121,62 @@ test('noise alone gives no clear tone', () => {
 });
 test('silence is reported as too quiet', () => {
   assert.ok(api.analyze(new Float32Array(4096).fill(-120), 44100).quiet);
+});
+
+// --- Combined scan readout ---
+console.log('Combined scan readout');
+const idle = { rec: false, micErr: null, snd: null, ovErr: null, ov: null, ridOn: false, ridErr: null, ridInfo: '', rid: [], phone: null, now: 100000 };
+test('before any data, each line says what it is waiting for', () => {
+  const s = api.cbSummary(idle);
+  assert.strictEqual(s.sound, 'Listening...');
+  assert.strictEqual(s.air, 'Checking for aircraft...');
+  assert.strictEqual(s.drone, 'Drone scan is off.');
+});
+test('sound line: quiet, no tone, tone, recording, microphone error', () => {
+  assert.ok(/Too quiet/.test(api.cbSummary({ ...idle, snd: { quiet: 1 } }).sound));
+  assert.strictEqual(api.cbSummary({ ...idle, snd: { f0: 300, mt: null } }).sound, 'No clear repeating tone.');
+  const t = api.cbSummary({ ...idle, snd: { f0: 276.4, count: 8, mt: [{ n: 'DJI Air 3', dr: 1 }, { n: 'Box fan', dr: 0 }] } }).sound;
+  assert.ok(/Tone at 276 Hz, 8 of 8 harmonics/.test(t) && /DJI Air 3 \(drone\), Box fan \(not a drone\)/.test(t));
+  assert.ok(/Paused/.test(api.cbSummary({ ...idle, rec: true, snd: { quiet: 1 } }).sound));
+  assert.strictEqual(api.cbSummary({ ...idle, micErr: 'Microphone unavailable (NotAllowedError).' }).sound, 'Microphone unavailable (NotAllowedError).');
+});
+test('aircraft line: none, nearest aircraft, and error', () => {
+  assert.strictEqual(api.cbSummary({ ...idle, ov: { t: 100000, all: 0, near: null } }).air, 'No aircraft reported nearby.');
+  const a = api.cbSummary({ ...idle, ov: { t: 95000, all: 3, near: { type: 'C172', flight: 'N123', hex: 'a1', altFt: 3281, distM: 2100, bearing: 45 } } }).air;
+  assert.ok(/3 aircraft nearby. Nearest: C172 N123, 2.1 km NE, 3,281 ft, 25° above the horizon. Updated 5 s ago./.test(a), a);
+  assert.ok(/on ground/.test(api.cbSummary({ ...idle, ov: { t: 100000, all: 1, near: { type: 'C172', hex: 'a1', altFt: 'ground', distM: 800, bearing: 200 } } }).air));
+  assert.strictEqual(api.cbSummary({ ...idle, ovErr: 'Location permission was denied.' }).air, 'Location permission was denied.');
+});
+test('drone line: error, nothing heard, and nearest drones first', () => {
+  assert.ok(/could not start: Permission was denied/.test(api.cbSummary({ ...idle, ridErr: 'Permission was denied.' }).drone));
+  const none = api.cbSummary({ ...idle, ridOn: true, ridInfo: 'Bluetooth on.' }).drone;
+  assert.ok(/^None heard yet. Bluetooth on./.test(none) && /Only drones that broadcast Remote ID/.test(none));
+  const phone = { lat: 34, lon: -117 };
+  const mk = (id, dLat) => ({ id, uaType: 2, lat: 34 + dLat, lon: -117 });
+  const d = api.cbSummary({ ...idle, ridOn: true, phone, rid: [mk('FAR', 0.004), mk('NEAR', 0.001), mk('MID', 0.002), mk('X4', 0.005), mk('X5', 0.006)] }).drone;
+  assert.ok(/^5 broadcasting: NEAR \(Multirotor or helicopter\), 111 m N of you; MID/.test(d), d);
+  assert.ok(/and 2 more\.$/.test(d), d);
+});
+
+test('radar: aircraft due east, north-up, lands right of centre', () => {
+  const p = api.rdPlace(5000, 0, 10000, 0);
+  assert(Math.abs(p.x - 0.5) < 1e-9 && Math.abs(p.y) < 1e-9 && Math.abs(p.bearing - 90) < 1e-9);
+});
+test('radar: pointing up rotates the picture so the heading is up', () => {
+  const p = api.rdPlace(5000, 0, 10000, 90);   // facing east: the eastern plane is dead ahead
+  assert(Math.abs(p.x) < 1e-9 && Math.abs(p.y - 0.5) < 1e-9);
+  const q = api.rdPlace(0, 5000, 10000, 90);   // north plane is to the left when facing east
+  assert(q.x < -0.49 && Math.abs(q.y) < 1e-9);
+});
+test('radar: dead reckoning moves a plane along its track', () => {
+  const g = api.rdGeom({ distM: 1000, bearing: 0, gs: 100, track: 90 }, 10);   // 100 kt = 51.4 m/s
+  assert(Math.abs(g.n - 1000) < 1e-6 && Math.abs(g.e - 514.4) < 0.1);
+  const old = api.rdGeom({ distM: 1000, bearing: 0, gs: 100, track: 90 }, 500);   // too old: no extrapolation
+  assert(Math.abs(old.e) < 1e-6);
+});
+test('radar: angle difference wraps around north', () => {
+  assert.strictEqual(api.rdDiff(359, 2), 3);
+  assert.strictEqual(api.rdDiff(90, 270), 180);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
